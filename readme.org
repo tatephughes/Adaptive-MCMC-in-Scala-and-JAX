@@ -1,0 +1,278 @@
+#+TITLE: Tangent into Adaptive MRTH
+#+STARTUP: latexpreview
+
+This is my attempt at implementing Adaptive Metropolis (or, as I prefer, Adaptive MRTH) in scala, using the breeze library.
+
+This is based on the example from the article "Examples of Adaptive MCMC" by Boberts and Rosenthal.
+
+* The toy problem
+
+We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma = M \in \mathbb R^{d\times d}$ is a matrix with random $\mathcal N[0,1]$ entries. Let's refresh how to use matrices in Scala by generating this matrix;
+
+#+begin_src scala
+  import breeze.linalg._
+  import breeze.stats.distributions._
+  import breeze.stats.distributions.Rand.FixedSeed.randBasis
+
+  val d = 3
+
+  val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
+  
+  val M = DenseMatrix(data: _*)
+  val Sigma = M.t * M
+
+  val n = 10000
+#+end_src
+
+Note that Breeze's ~DenseMatrix~ and ~DenseVector~ are actually mutable in Scala.
+
+We'll start by reusing code from the main document to implement traditional MRTH using the proposal distribution
+\begin{align*}
+Q(x,\cdot)=\mathcal N(x,\lambda^{2}I_d).
+\end{align*}
+Recalling the algorithm, we draw from $Q$ and the compute the Hastings ratio
+\begin{align*}
+r(x,y) = \frac{\pi(x)q(x,y)}{\pi(y)q(y,x)}.
+\end{align*}
+In this case,
+\begin{align*}
+r(x,y) = \frac{\exp(-\frac12 x^{\intercal}\Sigma^{-1}x)\exp(-\frac12 \lambda(x-y)^{\intercal}(x-y))}{\exp(-\frac12 y^{\intercal}\Sigma^{-1}y)\exp(-\frac12 \lambda(y-x)^{\intercal}(y-x))}
+\end{align*}
+Taking logs to simplify,
+\begin{align*}
+\log r(x,y)=-\frac12 (x^{\intercal}\Sigma^{-1}x + y^{\intercal}\Sigma^{-1}y).
+\end{align*}
+
+Fistly, for comparison's sake, we do a traditional Metropolis sampler on this model.
+We'll initialise the chain at $x_0 = 0$, and establish our tuning parameter
+
+#+begin_src scala
+  val x_0 = DenseVector.zeros[Double](d)
+
+  val lambda = 1.0
+#+end_src
+
+We now define the 'rule' for making a single step along our Markov chain, then use ~LazyList.iterate~ to create a lazily evaluated list for 'the rest of our Markov Chain'.
+
+#+begin_src scala
+  import scala.math
+  import java.util.concurrent.ThreadLocalRandom
+
+  def rng = ThreadLocalRandom.current()
+
+
+  def one_MRTH_step(x: DenseVector[Double], 
+                    prop_var: DenseMatrix[Double], 
+                    sigma_inv: DenseMatrix[Double]
+                   ): DenseVector[Double] = {
+
+    val proposed_move = MultivariateGaussian(x, prop_var).draw()
+    val log_acceptance_prob = math.min(0.0, 0.5 * ((x.t * sigma_inv * x) - (proposed_move.t * sigma_inv * proposed_move)))
+    val u = rng.nextDouble()
+    if (math.log(u) < log_acceptance_prob) then proposed_move else x
+
+  }
+
+
+  def MRTH(x0: DenseVector[Double], 
+           prop_var: DenseMatrix[Double], 
+           sigma_inv: DenseMatrix[Double]
+          ): LazyList[DenseVector[Double]] = {
+
+    LazyList.iterate(x0)((x:DenseVector[Double]) => one_MRTH_step(x,prop_var,sigma_inv))
+
+  }
+
+
+  val mrth_sample = MRTH(x_0, DenseMatrix.eye[Double](d) * (lambda*lambda), inv(Sigma))
+#+end_src
+
+We should take a look at the covariance matrix of this sample. To do this, we recall that the sample variance matrix is
+\begin{align*}
+\mathbb Var[X] = \frac{\sum XX^{\intercal}}{n} - \frac{(\sum X)(\sum X)^{\intercal}}{n^{2}}
+\end{align*}
+(we want it in this form for later). To get this in Scala, we use the a similar method to what we did before
+
+#+begin_src scala
+  val xsum = mrth_sample.take(n).foldLeft(DenseVector.zeros[Double](d))(_+_)
+
+  val xxtvals = mrth_sample.map((x: DenseVector[Double]) => x * x.t)
+
+  val xxtsum = xxtvals.take(n).foldLeft(DenseMatrix.zeros[Double](d,d))(_+_)
+#+end_src 
+
+And now we can get the empirical variance matrix as follows
+
+#+begin_src scala
+  val sample_var = (xxtsum :*= 1/n.toDouble) - ((xsum * xsum.t) :*= 1/(n*n).toDouble)
+#+end_src
+
+#+begin_src scala
+  println("The estimate for the Chain Variance matrix is \n" + (sample_var :*= (n.toDouble/(n.toDouble-1))))
+
+  println("The true target variance matrix is \n" + Sigma)
+#+end_src
+
+Lets also look at the trace plot;
+
+#+begin_src scala
+  import breeze.plot._
+
+  def plotter(sample: LazyList[DenseVector[Double]], 
+              n: Int, 
+              j: Int,
+              file_path: String): Unit = {
+
+    val xvals = Array.tabulate(n)(i => i.toDouble)
+    val yvals = sample.map((x: DenseVector[Double]) => x(0)).take(n).toArray
+
+
+    val f = Figure()
+    val p = f.subplot(0)
+
+
+    p += plot(xvals,yvals)
+    p.xlabel = "Index"
+    p.ylabel = "x_1"
+
+    p.title = "Trace Plot of x_j"
+
+    f.saveas(file_path)
+
+  }
+
+  //plotter(mrth_sample, n, 0, "./target/mdoc/Images/trace.png")
+
+#+end_src
+
+I would say, comparing these matrices, the algorithm does a reasonably good job at sampling from the target (although keep in mind, of course, that the sample variance is a biased estimator of the variance of our chain, we hope that this cleans up for high $n$). This has a very low dimension though; re-running the experiment with $d_{2}=100$ gets us the following
+
+#+begin_src scala
+
+  val d_2 = 100
+
+  val data_2 = Gaussian(0,1).sample(d_2*d_2).toArray.grouped(d_2).toArray
+
+  val M_2 = DenseMatrix(data_2: _*)
+
+  val Sigma_2 = M_2.t * M_2
+
+  val lambda_2 = 0.5
+
+  val x_0_2 = DenseVector.zeros[Double](d_2)
+
+  val mrth_sample_2 = MRTH(x_0_2, DenseMatrix.eye[Double](d_2) :*= (lambda_2*lambda_2), inv(Sigma_2))
+
+  val xsum_2 = mrth_sample_2.take(n).foldLeft(DenseVector.zeros[Double](d_2))(_+_)
+
+  val xxtvals_2 = mrth_sample_2.map((x: DenseVector[Double]) => x * x.t)
+
+  val xxtsum_2 = xxtvals_2.take(n).foldLeft(DenseMatrix.zeros[Double](d_2,d_2))(_+_)
+
+  val sample_var_2 = (xxtsum_2 :*= 1/n.toDouble) - ((xsum_2 * xsum_2.t) :*= 1/(n*n).toDouble)
+#+end_src
+
+
+#+begin_src scala
+  println("The estimate for the Chain Variance of x_1 is\n" + (sample_var_2(0,0) * (n.toDouble/(n.toDouble-1))))
+
+  println("The true target variance of x_1 is \n" + Sigma_2(0,0))
+#+end_src
+
+#+begin_src scala
+  plotter(mrth_sample_2, n, 0, "./target/mdoc/Images/trace2.png")
+#+end_src
+
+This is mixing terribly, as expected. Sometimes the vector never even gets accepted (the above image is generated randomly each time I export this document, so it may be flat or have a little movement). Therefore, we may be tempted to look into a better method; in comes adaptive metropolis.
+
+A AMRTH step is defined as follows;
+- If $j\leq 2d$, we do a MRTH step with proposal $q(x,\cdot)\sim \mathcal N(x,(0.1)^2I_d/d)$
+- If $j>2d$, we use the proposal $q(x,\cdot)\sim(1-\beta)\mathcal N(x,(2.38)^2\Sigma_j/d)+\beta\mathcal N(x,(0.1)^2I_d/d)$, where $\Sigma_j$ is the current empirical estimate of the covariance matrix so far.
+
+We can compute the empirical covariance matrix at step $j$ by
+\begin{align*}
+\Sigma_j=\frac{\sum_{i=0}^j x_ix_i^{\intercal}}{j} - \frac{(\sum_{i=0}^j x_i)(\sum_{i=0}^j x_i)^{\intercal}}{j^2}.
+\end{align*}
+
+The logic I'm using is to carry forward $\sum x_ix_i^{\intercal}$ and $\sum x_i$ (as well as the current index, $j$) as part of our 'chain', in order to compute the empirical covariance matrix as we go along (I should possibly do a $\frac{n}{n-1}$ transormation to this matrix too), in order to sample from the proposal when $j>2d$ .
+    
+#+begin_src scala
+  def one_AMRTH_step(state: AM_state, sigma_inv: DenseMatrix[Double]): AM_state = {
+
+    def rng = ThreadLocalRandom.current()
+
+
+    val j = state.j
+    val x_sum = state.x_sum
+    val xxt_sum = state.xxt_sum
+    val x = state._4
+
+    val d = x.length
+
+    if (j <= 2*d) then { // procedure for n<=2d
+
+      val proposed_move = MultivariateGaussian(x, DenseMatrix.eye[Double](d) * ((0.01)/d.toDouble)).draw()
+      val log_acceptance_prob = math.min(0.0, 0.5 * ((x.t * sigma_inv * x) - (proposed_move.t * sigma_inv * proposed_move)))
+      val u = rng.nextDouble()
+
+      if (math.log(u) < log_acceptance_prob) then {
+        return(AM_state(j+1, x_sum + proposed_move, xxt_sum + (proposed_move * proposed_move.t), proposed_move))
+      }  else {
+        return(AM_state(j+1, x_sum + x, xxt_sum + (x * x.t), x))
+      }
+
+    } else { // the actually adaptive part
+
+      val sigma_j = (xxt_sum * (1/j.toDouble))
+      - ((x_sum * x_sum.t) * (1/(j*j).toDouble))
+
+      val proposed_move = (0.95) * MultivariateGaussian(x, sigma_j * (2.38*2.38/d.toDouble)).draw() + 0.05 * MultivariateGaussian(x, DenseMatrix.eye[Double](d) * ((0.01)/d.toDouble)).draw()
+
+      val log_acceptance_prob = math.min(0.0, 0.5 * ((x.t * sigma_inv * x)
+        - (proposed_move.t * sigma_inv * proposed_move)))
+      val u = rng.nextDouble()
+
+      if (math.log(u) < log_acceptance_prob) then {
+        return(AM_state(j+1, x_sum + proposed_move,  xxt_sum + (proposed_move * proposed_move.t), proposed_move))
+      }  else {
+        return(AM_state(j+1, x_sum + x, xxt_sum + (x * x.t), x))
+      }
+    }
+
+  }
+
+  def AMRTH(state0: AM_state, sigma_inv: DenseMatrix[Double]): LazyList[AM_state] = {
+    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, sigma_inv))
+  }
+
+
+#+end_src
+
+and we can test the algorithm with
+
+#+begin_src scala
+  val d = 100
+
+  val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
+
+  val M = DenseMatrix(data: _*)
+  val Sigma = M.t * M
+
+  val state0 = AM_state(0, DenseVector.zeros[Double](d), DenseMatrix.eye[Double](d), DenseVector.zeros[Double](d))
+
+  val amrth_sample = AMRTH(state0, inv(Sigma))
+
+  val n = 10000
+  // anything above this gives a heap space error; gonna need to optimise a bit, this is clearly innefficient; likely to do with storing a big matrix and vector along with the state, or with the way this is compututed without use of QR or anythin
+
+  val xxt_sum = amrth_sample(n).xxt_sum
+  val x_sum = amrth_sample(n).x_sum
+
+  val sigma_j = (xxt_sum * (1/n.toDouble)) - ((x_sum * x_sum.t) * (1/(n*n).toDouble))
+
+  print("\nThe true variance of x_1 value is\n" + Sigma(0,0))
+
+  print("\n\nThe Empirical sigma value is\n" + sigma_j(0,0))
+
+  plotter(amrth_sample.map((x: AM_state) => x.x), n, 0, "./exports/adaptive_trace.png")
+#+end_src
