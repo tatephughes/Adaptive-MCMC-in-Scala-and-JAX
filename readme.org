@@ -1,4 +1,4 @@
-#+TITLE: Tangent into Adaptive MRTH
+#+TITLE: Adaptive MRTH
 #+STARTUP: latexpreview
 
 This is my attempt at implementing Adaptive Metropolis (or, as I prefer, Adaptive MRTH) in scala, using the breeze library.
