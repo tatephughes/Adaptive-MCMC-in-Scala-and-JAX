@@ -7,7 +7,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 
 
-case class AM_state(j: Int, 
+case class AM_state(j: Double, 
                     x_sum: DenseVector[Double], 
                     xxt_sum: DenseMatrix[Double],
                     x: DenseVector[Double])
@@ -40,7 +40,7 @@ object MyProgram:
   }
 
   
-  def one_AMRTH_step(state: AM_state, sigma_inv: DenseMatrix[Double]): AM_state = {
+  def one_AMRTH_step(state: AM_state, q:DenseMatrix[Double], r: DenseMatrix[Double]): AM_state = {
 
     def rng = ThreadLocalRandom.current()
 
@@ -54,53 +54,65 @@ object MyProgram:
 
     if (j <= 2*d) then { // procedure for n<=2d
 
-      val proposed_move = MultivariateGaussian(x, DenseMatrix.eye[Double](d) * ((0.01)/d.toDouble)).draw()
-      val log_acceptance_prob = math.min(0.0, 0.5 * ((x.t * sigma_inv * x) - (proposed_move.t * sigma_inv * proposed_move)))
+      val proposed_move = x.map((xi:Double) => Gaussian(xi, 0.01/d.toDouble).sample())
+      val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (proposed_move.t * (r \ (q.t * proposed_move))))
+      val log_acceptance_prob = math.min(0.0, alpha)
       val u = rng.nextDouble()
 
       if (math.log(u) < log_acceptance_prob) then {
-        return(AM_state(j+1, x_sum + proposed_move, xxt_sum + (proposed_move * proposed_move.t), proposed_move))
-      }  else {
+        val nx_sum = x_sum + proposed_move
+        val nxxt_sum = xxt_sum + (proposed_move * proposed_move.t)
+        return(AM_state(j+1, nx_sum, nxxt_sum, proposed_move))
+      } else {
+        val nx_sum = x_sum + x
+        val nxxt_sum = xxt_sum + (x * x.t)
         return(AM_state(j+1, x_sum + x, xxt_sum + (x * x.t), x))
       }
 
     } else { // the actually adaptive part
 
-      val sigma_j = (xxt_sum * (1/j.toDouble))
-      - ((x_sum * x_sum.t) * (1/(j*j).toDouble))
+      val sigma_j = (xxt_sum / j)
+                    - ((x_sum * x_sum.t) / (j*j))
 
-      val proposed_move = (0.95) * MultivariateGaussian(x, sigma_j * (2.38*2.38/d.toDouble)).draw() + 0.05 * MultivariateGaussian(x, DenseMatrix.eye[Double](d) * ((0.01)/d.toDouble)).draw()
-
-      val log_acceptance_prob = math.min(0.0, 0.5 * ((x.t * sigma_inv * x)
-        - (proposed_move.t * sigma_inv * proposed_move)))
+      val proposed_move = 0.95 * MultivariateGaussian(x, sigma_j * (2.38*2.38/d.toDouble)).draw() 
+                          + 0.05 * x.map((xi:Double) => Gaussian(xi,0.01/d.toDouble).sample())
+      val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (proposed_move.t * (r \ (q.t * proposed_move))))
+      val log_acceptance_prob = math.min(0.0, alpha)
       val u = rng.nextDouble()
 
       if (math.log(u) < log_acceptance_prob) then {
-        return(AM_state(j+1, x_sum + proposed_move,  xxt_sum + (proposed_move * proposed_move.t), proposed_move))
-      }  else {
-        return(AM_state(j+1, x_sum + x, xxt_sum + (x * x.t), x))
+        val nx_sum = x_sum + proposed_move
+        val nxxt_sum = xxt_sum + (proposed_move * proposed_move.t)
+        return(AM_state(j+1, nx_sum, nxxt_sum, proposed_move))
+      } else {
+        val nx_sum = x_sum + x
+        val nxxt_sum = xxt_sum + (x * x.t)
+        return(AM_state(j+1, nx_sum, nxxt_sum + (x * x.t), x))
       }
     }
 
   }
 
-  def AMRTH(state0: AM_state, sigma_inv: DenseMatrix[Double]): LazyList[AM_state] = {
-    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, sigma_inv))
+  def AMRTH(state0: AM_state, sigma: DenseMatrix[Double]): LazyList[AM_state] = {
+
+    val qr.QR(q,r) = qr(sigma)
+
+    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, q, r))
   }
 
 
   @main def run(): Unit =
     
-    val d = 100
+    val d = 3
 
     val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
   
     val M = DenseMatrix(data: _*)
-    val Sigma = M.t * M
+    val sigma = M.t * M
 
-    val state0 = AM_state(0, DenseVector.zeros[Double](d), DenseMatrix.eye[Double](d), DenseVector.zeros[Double](d))
+    val state0 = AM_state(0.0, DenseVector.zeros[Double](d), DenseMatrix.eye[Double](d), DenseVector.zeros[Double](d))
 
-    val amrth_sample = AMRTH(state0, inv(Sigma))
+    val amrth_sample = AMRTH(state0, sigma)
 
     val n = 10000
     // anything above this gives a heap space error; gonna need to optimise a bit, this is clearly innefficient; likely to do with storing a big matrix and vector along with the state, or with the way this is compututed without use of QR or anythin
@@ -108,11 +120,10 @@ object MyProgram:
     val xxt_sum = amrth_sample(n).xxt_sum
     val x_sum = amrth_sample(n).x_sum
     
-    val sigma_j = (xxt_sum * (1/n.toDouble)) - ((x_sum * x_sum.t) * (1/(n*n).toDouble))
+    val sigma_j = (xxt_sum / n.toDouble) - (x_sum * x_sum.t) / (n*n).toDouble
 
-    print("\nThe true variance of x_1 value is\n" + Sigma(0,0))
+    print("\nThe true variance of x_1 value is\n" + sigma)
 
-    print("\n\nThe Empirical sigma value is\n" + sigma_j(0,0))
+    print("\n\nThe Empirical sigma value is\n" + sigma_j)
 
-    plotter(amrth_sample.map((x: AM_state) => x.x), n, 0, "./exports/adaptive_trace.png")
-    // looks like n=10000 just isn't enough for the adaptiveness to fully kick in 
+    // plotter(amrth_sample.map((x: AM_state) => x.x), n, 0, "./exports/adaptive_trace.png")
