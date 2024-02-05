@@ -29,9 +29,9 @@ We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma 
 Note that Breeze's ~DenseMatrix~ and ~DenseVector~ are actually mutable in Scala.
 
 We'll start by reusing code from the main document to implement traditional MRTH using the proposal distribution
-\begin{align*}
+$$\begin{aligned}
 Q(x,\cdot)=\mathcal N(x,\lambda^{2}I_d).
-\end{align*}
+\end{aligned}$$
 Recalling the algorithm, we draw from $Q$ and the compute the Hastings ratio
 \begin{align*}
 r(x,y) = \frac{\pi(x)q(x,y)}{\pi(y)q(y,x)}.
