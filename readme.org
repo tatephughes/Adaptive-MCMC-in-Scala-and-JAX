@@ -36,18 +36,20 @@ Q(x,\cdot)=\mathcal N(x,\lambda^{2}I_d).
 
 Recalling the algorithm, we draw from $Q$ and the compute the Hastings ratio
 
-\begin{align*}
+$$\begin{aligned}
 r(x,y) = \frac{\pi(x)q(x,y)}{\pi(y)q(y,x)}.
-\end{align*}
+\end{aligned}$$
 
 In this case,
-\begin{align*}
-r(x,y) = \frac{\exp(-\frac12 x^{\intercal}\Sigma^{-1}x)\exp(-\frac12 \lambda(x-y)^{\intercal}(x-y))}{\exp(-\frac12 y^{\intercal}\Sigma^{-1}y)\exp(-\frac12 \lambda(y-x)^{\intercal}(y-x))}
-\end{align*}
+
+$$\begin{aligned}r(x,y) = \frac{\exp(-\frac12 x^{\intercal}\Sigma^{-1}x)\exp(-\frac12 \lambda(x-y)^{\intercal}(x-y))}{\exp(-\frac12 y^{\intercal}\Sigma^{-1}y)\exp(-\frac12 \lambda(y-x)^{\intercal}(y-x))}
+\end{aligned}$$
+
 Taking logs to simplify,
-\begin{align*}
+
+$$\begin{aligned}
 \log r(x,y)=-\frac12 (x^{\intercal}\Sigma^{-1}x - y^{\intercal}\Sigma^{-1}y).
-\end{align*}
+\end{aligned}$$
 
 Fistly, for comparison's sake, we do a traditional Metropolis sampler on this model.
 We'll initialise the chain at $x_0 = 0$, and establish our tuning parameter
@@ -96,9 +98,11 @@ We now define the 'rule' for making a single step along our Markov chain, then u
 #+end_src
 
 We should take a look at the covariance matrix of this sample. To do this, we recall that the sample variance matrix is
-\begin{align*}
+
+$$\begin{aligned}
 \mathbb Var[X] = \frac{\sum XX^{\intercal}}{n} - \frac{(\sum X)(\sum X)^{\intercal}}{n^{2}}
-\end{align*}
+\end{aligned}$$
+
 (we want it in this form for later). To get this in Scala, we use the a similar method to what we did before
 
 #+begin_src scala
@@ -198,9 +202,9 @@ A AMRTH step is defined as follows;
 - If $j>2d$, we use the proposal $q(x,\cdot)\sim(1-\beta)\mathcal N(x,(2.38)^2\Sigma_j/d)+\beta\mathcal N(x,(0.1)^2I_d/d)$, where $\Sigma_j$ is the current empirical estimate of the covariance matrix so far.
 
 We can compute the empirical covariance matrix at step $j$ by
-\begin{align*}
+$$\begin{aligned}
 \Sigma_j=\frac{\sum_{i=0}^j x_ix_i^{\intercal}}{j} - \frac{(\sum_{i=0}^j x_i)(\sum_{i=0}^j x_i)^{\intercal}}{j^2}.
-\end{align*}
+\end{aligned}$$
 
 The logic I'm using is to carry forward $\sum x_ix_i^{\intercal}$ and $\sum x_i$ (as well as the current index, $j$) as part of our 'chain', in order to compute the empirical covariance matrix as we go along (I should possibly do a $\frac{n}{n-1}$ transormation to this matrix too), in order to sample from the proposal when $j>2d$ .
 
