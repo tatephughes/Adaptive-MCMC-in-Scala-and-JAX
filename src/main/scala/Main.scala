@@ -40,10 +40,9 @@ object MyProgram:
   }
 
   
-  def one_AMRTH_step(state: AM_state, q:DenseMatrix[Double], r: DenseMatrix[Double]): AM_state = {
+  def one_AMRTH_step(state: AM_state, q: DenseMatrix[Double], r: DenseMatrix[Double]): AM_state = {
 
     def rng = ThreadLocalRandom.current()
-
 
     val j = state.j
     val x_sum = state.x_sum
@@ -71,12 +70,16 @@ object MyProgram:
 
     } else { // the actually adaptive part
 
-      val sigma_j = (xxt_sum / j)
-                    - ((x_sum * x_sum.t) / (j*j))
+      //val sigma_j = (xxt_sum / j)
+      //              - ((x_sum * x_sum.t) / (j*j))
+      val sigma_j = q * r // a test, should be optimal by Roberts and Rosenthal (2001)
+      // even then, it severely overestimates!
+      
 
       val proposed_move = 0.95 * MultivariateGaussian(x, sigma_j * (2.38*2.38/d.toDouble)).draw() 
-                          + 0.05 * x.map((xi:Double) => Gaussian(xi,0.01/d.toDouble).sample())
+                          //+ 0.05 * x.map((xi:Double) => Gaussian(xi,0.01/d.toDouble).sample())
       val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (proposed_move.t * (r \ (q.t * proposed_move))))
+      // at this point, im almosts convinced ive got my acceptance ratio wrong!
       val log_acceptance_prob = math.min(0.0, alpha)
       val u = rng.nextDouble()
 
@@ -100,10 +103,9 @@ object MyProgram:
     LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, q, r))
   }
 
-
   @main def run(): Unit =
     
-    val d = 3
+    val d = 25
 
     val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
   
@@ -114,13 +116,20 @@ object MyProgram:
 
     val amrth_sample = AMRTH(state0, sigma)
 
-    val n = 10000
-    // anything above this gives a heap space error; gonna need to optimise a bit, this is clearly innefficient; likely to do with storing a big matrix and vector along with the state, or with the way this is compututed without use of QR or anythin
+    val n = 100000
 
     val xxt_sum = amrth_sample(n).xxt_sum
     val x_sum = amrth_sample(n).x_sum
     
-    val sigma_j = (xxt_sum / n.toDouble) - (x_sum * x_sum.t) / (n*n).toDouble
+    val sigma_j = (xxt_sum / n.toDouble) - ((x_sum * x_sum.t) / (n*n).toDouble)
+
+    //val eigvalues = eig(sqrtm(sigma_j)*sqrtm(inv(sigma))).eigenvalues
+
+    //val eigminussquare = eigvalues.map(1/(_*_))
+
+    //val eiginv = eigvalues.map(1/_)
+
+    //val b = d * ((eigminussquare.sum)/((eiginv.sum)*(eiginv.sum)))
 
     print("\nThe true variance of x_1 value is\n" + sigma)
 

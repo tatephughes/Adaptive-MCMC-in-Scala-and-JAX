@@ -1,5 +1,8 @@
 #+TITLE: Adaptive MRTH
 
+#+BIBLIOGRAPHY: Bibliography.bib
+#+LATEX_HEADER: \usepackage{amsmath,amsfonts,amssymb}
+
 This is my attempt at implementing Adaptive Metropolis (or, as I prefer, Adaptive MRTH) in scala, using the breeze library.
 
 This is based on the example from the article "Examples of Adaptive MCMC" by Boberts and Rosenthal.
@@ -18,7 +21,7 @@ We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma 
   val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
   
   val M = DenseMatrix(data: _*)
-  val Sigma = M.t * M
+  val sigma = M.t * M
 
   val n = 10000
 #+end_src
@@ -62,11 +65,13 @@ We now define the 'rule' for making a single step along our Markov chain, then u
 
   def one_MRTH_step(x: DenseVector[Double], 
                     prop_var: DenseMatrix[Double], 
-                    sigma_inv: DenseMatrix[Double]
+                    r: DenseMatrix[Double],
+                    q: DenseMatrix[Double]
                    ): DenseVector[Double] = {
 
-    val proposed_move = MultivariateGaussian(x, prop_var).draw()
-    val log_acceptance_prob = math.min(0.0, 0.5 * ((x.t * sigma_inv * x) - (proposed_move.t * sigma_inv * proposed_move)))
+    val proposed_move = x.map((xi:Double) => Gaussian(xi, 0.01/d.toDouble).sample())
+    val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (proposed_move.t * (r \ (q.t * proposed_move))))
+    val log_acceptance_prob = math.min(0.0, alpha)
     val u = rng.nextDouble()
     if (math.log(u) < log_acceptance_prob) then proposed_move else x
 
@@ -198,10 +203,16 @@ The logic I'm using is to carry forward $\sum x_ix_i^{\intercal}$ and $\sum x_i$
 I also improved the efficiency by removing any unnecessary inversions and constructions of diagonal matrices.
     
 #+begin_src scala
+
+  case class AM_state(j: Double, 
+                      x_sum: DenseVector[Double], 
+                      xxt_sum: DenseMatrix[Double],
+                      x: DenseVector[Double])
+
+  
   def one_AMRTH_step(state: AM_state, q:DenseMatrix[Double], r: DenseMatrix[Double]): AM_state = {
 
     def rng = ThreadLocalRandom.current()
-
 
     val j = state.j
     val x_sum = state.x_sum
