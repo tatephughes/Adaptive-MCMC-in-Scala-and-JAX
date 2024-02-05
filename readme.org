@@ -35,9 +35,11 @@ Q(x,\cdot)=\mathcal N(x,\lambda^{2}I_d).
 \end{aligned}$$
 
 Recalling the algorithm, we draw from $Q$ and the compute the Hastings ratio
+
 \begin{align*}
 r(x,y) = \frac{\pi(x)q(x,y)}{\pi(y)q(y,x)}.
 \end{align*}
+
 In this case,
 \begin{align*}
 r(x,y) = \frac{\exp(-\frac12 x^{\intercal}\Sigma^{-1}x)\exp(-\frac12 \lambda(x-y)^{\intercal}(x-y))}{\exp(-\frac12 y^{\intercal}\Sigma^{-1}y)\exp(-\frac12 \lambda(y-x)^{\intercal}(y-x))}
