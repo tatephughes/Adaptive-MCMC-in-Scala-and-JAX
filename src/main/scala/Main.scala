@@ -13,7 +13,6 @@ case class AM_state(j: Double,
                     x: DenseVector[Double])
 
 
-
 object MyProgram:
 
   def plotter(sample: LazyList[DenseVector[Double]], 
@@ -38,11 +37,10 @@ object MyProgram:
     f.saveas(file_path)
 
   }
-
   
   def one_AMRTH_step(state: AM_state, q: DenseMatrix[Double], r: DenseMatrix[Double]): AM_state = {
 
-    def rng = ThreadLocalRandom.current()
+    def rng = ThreadLocalRandom.current() // maybe use breeze generator to fix the seed
 
     val j = state.j
     val x_sum = state.x_sum
@@ -53,7 +51,7 @@ object MyProgram:
 
     if (j <= 2*d) then { // procedure for n<=2d
 
-      val proposed_move = x.map((xi:Double) => Gaussian(xi, 0.01/d.toDouble).sample())
+      val proposed_move = x.map((xi:Double) => Gaussian(xi, 1/d.toDouble).sample())
       val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (proposed_move.t * (r \ (q.t * proposed_move))))
       val log_acceptance_prob = math.min(0.0, alpha)
       val u = rng.nextDouble()
@@ -65,32 +63,37 @@ object MyProgram:
       } else {
         val nx_sum = x_sum + x
         val nxxt_sum = xxt_sum + (x * x.t)
-        return(AM_state(j+1, x_sum + x, xxt_sum + (x * x.t), x))
+        return(AM_state(j+1, nx_sum, nxxt_sum, x))
       }
 
     } else { // the actually adaptive part
 
-      //val sigma_j = (xxt_sum / j)
-      //              - ((x_sum * x_sum.t) / (j*j))
-      val sigma_j = q * r // a test, should be optimal by Roberts and Rosenthal (2001)
-      // even then, it severely overestimates!
-      
+      //print("\nif you're seeing this, an error has occured!\n")
 
-      val proposed_move = 0.95 * MultivariateGaussian(x, sigma_j * (2.38*2.38/d.toDouble)).draw() 
-                          //+ 0.05 * x.map((xi:Double) => Gaussian(xi,0.01/d.toDouble).sample())
+      val sigma_j = (xxt_sum / j)
+                    - ((x_sum * x_sum.t) / (j*j))
+
+      val u1 = rng.nextDouble()
+
+      val proposed_move = if (u1 < 0.95) then {
+        MultivariateGaussian(x, sigma_j * (2.38*2.38/d.toDouble)).draw()
+      } else {
+        x.map((xi:Double) => Gaussian(xi, 0.01/d.toDouble).sample())
+      }
+
       val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (proposed_move.t * (r \ (q.t * proposed_move))))
-      // at this point, im almosts convinced ive got my acceptance ratio wrong!
-      val log_acceptance_prob = math.min(0.0, alpha)
-      val u = rng.nextDouble()
 
-      if (math.log(u) < log_acceptance_prob) then {
+      val log_acceptance_prob = math.min(0.0, alpha)
+      val u2 = rng.nextDouble()
+
+      if (math.log(u2) < log_acceptance_prob) then {
         val nx_sum = x_sum + proposed_move
         val nxxt_sum = xxt_sum + (proposed_move * proposed_move.t)
         return(AM_state(j+1, nx_sum, nxxt_sum, proposed_move))
       } else {
         val nx_sum = x_sum + x
         val nxxt_sum = xxt_sum + (x * x.t)
-        return(AM_state(j+1, nx_sum, nxxt_sum + (x * x.t), x))
+        return(AM_state(j+1, nx_sum, nxxt_sum, x))
       }
     }
 
@@ -131,8 +134,8 @@ object MyProgram:
 
     //val b = d * ((eigminussquare.sum)/((eiginv.sum)*(eiginv.sum)))
 
-    print("\nThe true variance of x_1 value is\n" + sigma)
+    print("\nThe true variance of x_1 value is\n" + sigma(1,1))
 
-    print("\n\nThe Empirical sigma value is\n" + sigma_j)
+    print("\n\nThe Empirical sigma value is\n" + sigma_j(1,1))
 
     // plotter(amrth_sample.map((x: AM_state) => x.x), n, 0, "./exports/adaptive_trace.png")

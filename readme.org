@@ -86,10 +86,10 @@ We now define the 'rule' for making a single step along our Markov chain, then u
 
   def MRTH(x0: DenseVector[Double], 
            prop_var: DenseMatrix[Double], 
-           sigma_inv: DenseMatrix[Double]
+           sigma: DenseMatrix[Double]
           ): LazyList[DenseVector[Double]] = {
 
-    LazyList.iterate(x0)((x:DenseVector[Double]) => one_MRTH_step(x,prop_var,sigma_inv))
+    LazyList.iterate(x0)((x:DenseVector[Double]) => one_MRTH_step(x,prop_var,sigma))
 
   }
 
