@@ -13,7 +13,7 @@ case class AM_state(j: Double,
                     x: DenseVector[Double])
 
 
-object MyProgram:
+object AdaptiveMetropolis:
 
   def plotter(sample: LazyList[DenseVector[Double]], 
               n: Int, 
@@ -67,8 +67,6 @@ object MyProgram:
       }
 
     } else { // the actually adaptive part
-
-      //print("\nif you're seeing this, an error has occured!\n")
 
       val sigma_j = (xxt_sum / j)
                     - ((x_sum * x_sum.t) / (j*j))
