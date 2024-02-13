@@ -2,15 +2,14 @@ import breeze.plot._
 import breeze.linalg._
 import breeze.numerics._
 import breeze.stats.distributions._
-import breeze.stats.distributions.Rand.FixedSeed.randBasis
-import java.util.concurrent.ThreadLocalRandom
-
-
+//import breeze.stats.distributions.Rand.FixedSeed.randBasis
+import org.apache.commons.math3.random.MersenneTwister
 
 case class AM_state(j: Double, 
                     x_sum: DenseVector[Double], 
                     xxt_sum: DenseMatrix[Double],
                     x: DenseVector[Double])
+
 
 
 object AdaptiveMetropolis:
@@ -38,9 +37,9 @@ object AdaptiveMetropolis:
 
   }
   
-  def one_AMRTH_step(state: AM_state, q: DenseMatrix[Double], r: DenseMatrix[Double]): AM_state = {
+  def one_AMRTH_step(state: AM_state, q: DenseMatrix[Double], r: DenseMatrix[Double], seed: Long): AM_state = {
 
-    def rng = ThreadLocalRandom.current() // maybe use breeze generator to fix the seed
+    implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(seed)))
 
     val j = state.j
     val x_sum = state.x_sum
@@ -54,7 +53,7 @@ object AdaptiveMetropolis:
       val proposed_move = x.map((xi:Double) => Gaussian(xi, 1/d.toDouble).sample())
       val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (proposed_move.t * (r \ (q.t * proposed_move))))
       val log_acceptance_prob = math.min(0.0, alpha)
-      val u = rng.nextDouble()
+      val u = Uniform(0,1).draw()
 
       if (math.log(u) < log_acceptance_prob) then {
         val nx_sum = x_sum + proposed_move
@@ -71,7 +70,7 @@ object AdaptiveMetropolis:
       val sigma_j = (xxt_sum / j)
                     - ((x_sum * x_sum.t) / (j*j))
 
-      val u1 = rng.nextDouble()
+      val u1 = Uniform(0,1).draw()
 
       val proposed_move = if (u1 < 0.95) then {
         MultivariateGaussian(x, sigma_j * (2.38*2.38/d.toDouble)).draw()
@@ -82,7 +81,7 @@ object AdaptiveMetropolis:
       val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (proposed_move.t * (r \ (q.t * proposed_move))))
 
       val log_acceptance_prob = math.min(0.0, alpha)
-      val u2 = rng.nextDouble()
+      val u2 = Uniform(0,1).draw()
 
       if (math.log(u2) < log_acceptance_prob) then {
         val nx_sum = x_sum + proposed_move
@@ -97,15 +96,19 @@ object AdaptiveMetropolis:
 
   }
 
-  def AMRTH(state0: AM_state, sigma: DenseMatrix[Double]): LazyList[AM_state] = {
+  def AMRTH(state0: AM_state, sigma: DenseMatrix[Double], seed: Long): LazyList[AM_state] = {
 
     val qr.QR(q,r) = qr(sigma)
 
-    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, q, r))
+    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, q, r, seed + state.j.toLong))
   }
 
   @main def run(): Unit =
-    
+
+    val seed: Long = 42L
+
+    implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(seed)))
+
     val d = 25
 
     val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
@@ -115,9 +118,9 @@ object AdaptiveMetropolis:
 
     val state0 = AM_state(0.0, DenseVector.zeros[Double](d), DenseMatrix.eye[Double](d), DenseVector.zeros[Double](d))
 
-    val amrth_sample = AMRTH(state0, sigma)
+    val amrth_sample = AMRTH(state0, sigma, seed)
 
-    val n = 100000
+    val n: Int = 100000
 
     val xxt_sum = amrth_sample(n).xxt_sum
     val x_sum = amrth_sample(n).x_sum
