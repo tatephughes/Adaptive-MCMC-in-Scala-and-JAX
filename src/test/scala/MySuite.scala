@@ -14,6 +14,8 @@ class AMSuite extends AnyFlatSpec{
 
   import AdaptiveMetropolis._
 
+  val seed: Long = 42L
+
   val d = 25
   val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
   val M = DenseMatrix(data: _*)
@@ -27,7 +29,7 @@ class AMSuite extends AnyFlatSpec{
   )
 
   "one_AMRTH_step" should "make a small initial step" in {
-    val state1 = one_AMRTH_step(state0, r, q)
+    val state1 = one_AMRTH_step(state0, r, q, seed)
     assert(norm(state1.x - state0.x) < 100*d)
   }
 
