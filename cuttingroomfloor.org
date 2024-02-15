@@ -1,0 +1,168 @@
+#+TITLE: Cutting Room Floor
+
+We'll start by reusing code from the main document to implement traditional MRTH using the proposal distribution
+
+$$\begin{aligned}
+Q(x,\cdot)=\mathcal N(x,\lambda^{2}I_d).
+\end{aligned}$$
+
+Recalling the algorithm, we draw from $Q$ and the compute the Hastings ratio
+
+$$\begin{aligned}
+r(x,y) = \frac{\pi(x)q(x,y)}{\pi(y)q(y,x)}.
+\end{aligned}$$
+
+In this case,
+
+$$\begin{aligned}r(x,y) = \frac{\exp(-\frac12 x^{\intercal}\Sigma^{-1}x)\exp(-\frac12 \lambda(x-y)^{\intercal}(x-y))}{\exp(-\frac12 y^{\intercal}\Sigma^{-1}y)\exp(-\frac12 \lambda(y-x)^{\intercal}(y-x))}
+\end{aligned}$$
+
+Taking logs to simplify,
+
+$$\begin{aligned}
+\log r(x,y)=-\frac12 (x^{\intercal}\Sigma^{-1}x - y^{\intercal}\Sigma^{-1}y).
+\end{aligned}$$
+
+Fistly, for comparison's sake, we do a traditional Metropolis sampler on this model.
+We'll initialise the chain at $x_0 = 0$, and establish our tuning parameter
+
+#+begin_src scala
+  val x_0 = DenseVector.zeros[Double](d)
+
+  val lambda = 1.0
+#+end_src
+
+We now define the 'rule' for making a single step along our Markov chain, then use ~LazyList.iterate~ to create a lazily evaluated list for 'the rest of our Markov Chain'.
+
+#+begin_src scala
+  import scala.math
+  import java.util.concurrent.ThreadLocalRandom
+
+  def rng = ThreadLocalRandom.current()
+
+
+  def one_MRTH_step(x: DenseVector[Double], 
+                    prop_var: DenseMatrix[Double], 
+                    r: DenseMatrix[Double],
+                    q: DenseMatrix[Double]
+                   ): DenseVector[Double] = {
+
+    val proposed_move = x.map((xi:Double) => Gaussian(xi, 0.01/d.toDouble).sample())
+    val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (proposed_move.t * (r \ (q.t * proposed_move))))
+    val log_acceptance_prob = math.min(0.0, alpha)
+    val u = rng.nextDouble()
+    if (math.log(u) < log_acceptance_prob) then proposed_move else x
+
+  }
+
+
+  def MRTH(x0: DenseVector[Double], 
+           prop_var: DenseMatrix[Double], 
+           sigma: DenseMatrix[Double]
+          ): LazyList[DenseVector[Double]] = {
+
+    LazyList.iterate(x0)((x:DenseVector[Double]) => one_MRTH_step(x,prop_var,sigma))
+
+  }
+
+
+  val mrth_sample = MRTH(x_0, DenseMatrix.eye[Double](d) * (lambda*lambda), inv(Sigma))
+#+end_src
+
+We should take a look at the covariance matrix of this sample. To do this, we recall that the sample variance matrix is
+
+$$\begin{aligned}
+\mathbb Var[X] = \frac{\sum XX^{\intercal}}{n} - \frac{(\sum X)(\sum X)^{\intercal}}{n^{2}}
+\end{aligned}$$
+
+(we want it in this form for later). To get this in Scala, we use the a similar method to what we did before
+
+#+begin_src scala
+  val xsum = mrth_sample.take(n).foldLeft(DenseVector.zeros[Double](d))(_+_)
+
+  val xxtvals = mrth_sample.map((x: DenseVector[Double]) => x * x.t)
+
+  val xxtsum = xxtvals.take(n).foldLeft(DenseMatrix.zeros[Double](d,d))(_+_)
+#+end_src 
+
+And now we can get the empirical variance matrix as follows
+
+#+begin_src scala
+  val sample_var = (xxtsum :*= 1/n.toDouble) - ((xsum * xsum.t) :*= 1/(n*n).toDouble)
+#+end_src
+
+#+begin_src scala
+  println("The estimate for the Chain Variance matrix is \n" + (sample_var :*= (n.toDouble/(n.toDouble-1))))
+
+  println("The true target variance matrix is \n" + Sigma)
+#+end_src
+
+Lets also look at the trace plot;
+
+#+begin_src scala
+  import breeze.plot._
+
+  def plotter(sample: LazyList[DenseVector[Double]], 
+              n: Int, 
+              j: Int,
+              file_path: String): Unit = {
+
+    val xvals = Array.tabulate(n)(i => i.toDouble)
+    val yvals = sample.map((x: DenseVector[Double]) => x(0)).take(n).toArray
+
+
+    val f = Figure()
+    val p = f.subplot(0)
+
+
+    p += plot(xvals,yvals)
+    p.xlabel = "Index"
+    p.ylabel = "x_1"
+
+    p.title = "Trace Plot of x_j"
+
+    f.saveas(file_path)
+
+  }
+
+  //plotter(mrth_sample, n, 0, "./target/mdoc/Images/trace.png")
+
+#+end_src
+
+I would say, comparing these matrices, the algorithm does a reasonably good job at sampling from the target (although keep in mind, of course, that the sample variance is a biased estimator of the variance of our chain, we hope that this cleans up for high $n$). This has a very low dimension though; re-running the experiment with $d_{2}=100$ gets us the following
+
+#+begin_src scala
+
+  val d_2 = 100
+
+  val data_2 = Gaussian(0,1).sample(d_2*d_2).toArray.grouped(d_2).toArray
+
+  val M_2 = DenseMatrix(data_2: _*)
+
+  val Sigma_2 = M_2.t * M_2
+
+  val lambda_2 = 0.5
+
+  val x_0_2 = DenseVector.zeros[Double](d_2)
+
+  val mrth_sample_2 = MRTH(x_0_2, DenseMatrix.eye[Double](d_2) :*= (lambda_2*lambda_2), inv(Sigma_2))
+
+  val xsum_2 = mrth_sample_2.take(n).foldLeft(DenseVector.zeros[Double](d_2))(_+_)
+
+  val xxtvals_2 = mrth_sample_2.map((x: DenseVector[Double]) => x * x.t)
+
+  val xxtsum_2 = xxtvals_2.take(n).foldLeft(DenseMatrix.zeros[Double](d_2,d_2))(_+_)
+
+  val sample_var_2 = (xxtsum_2 :*= 1/n.toDouble) - ((xsum_2 * xsum_2.t) :*= 1/(n*n).toDouble)
+#+end_src
+
+
+#+begin_src scala
+  println("The estimate for the Chain Variance of x_1 is\n" + (sample_var_2(0,0) * (n.toDouble/(n.toDouble-1))))
+
+  println("The true target variance of x_1 is \n" + Sigma_2(0,0))
+#+end_src
+
+#+begin_src scala
+  plotter(mrth_sample_2, n, 0, "./target/mdoc/Images/trace2.png")
+#+end_src

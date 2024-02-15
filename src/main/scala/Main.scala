@@ -2,7 +2,6 @@ import breeze.plot._
 import breeze.linalg._
 import breeze.numerics._
 import breeze.stats.distributions._
-//import breeze.stats.distributions.Rand.FixedSeed.randBasis
 import org.apache.commons.math3.random.MersenneTwister
 
 implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(42L)))
@@ -129,8 +128,8 @@ object AdaptiveMetropolis:
     // initial state
     val state0 = AM_state(0.0, DenseVector.zeros[Double](d), DenseMatrix.eye[Double](d), DenseVector.zeros[Double](d))
 
-    val n: Int = 10000 // size of the desired sample
-    val burnin: Int = 10000
+    val n: Int = 100000 // size of the desired sample
+    val burnin: Int = 100000
     val thinrate: Int = 10
     // The actual number of iterations computed is n/thin + burnin
 

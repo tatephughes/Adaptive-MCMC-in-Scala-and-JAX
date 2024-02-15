@@ -1,6 +1,10 @@
 val scala3Version = "3.3.1"
 
 lazy val root = project
+
+  .in(file("./myproject-docs"))
+  .enablePlugins(MdocPlugin)
+
   .in(file("."))
   .settings(
     name := "Adaptive MCMC in Scala",
