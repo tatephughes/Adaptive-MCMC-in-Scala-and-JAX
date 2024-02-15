@@ -24,22 +24,19 @@ object AdaptiveMetropolis:
       droppedchain.head #:: thin(droppedchain.tail, th)
   }
 
-  def plotter(sample: LazyList[DenseVector[Double]], 
-              n: Int, 
-              j: Int,
+  def plotter(sample: Array[DenseVector[Double]], // the sample to plot
+              j: Int, // the coordinate to plot
               file_path: String): Unit = {
 
-    val xvals = Array.tabulate(n)(i => i.toDouble)
-    val yvals = sample.map((x: DenseVector[Double]) => x(0)).take(n).toArray
-
+    val y = DenseVector(sample.map(x => x(j)))
+    val x = DenseVector.tabulate(y.length)(i => (i+1).toDouble)
 
     val f = Figure()
     val p = f.subplot(0)
 
-
-    p += plot(xvals,yvals)
+    p += plot(x,y)
     p.xlabel = "Index"
-    p.ylabel = "x_1"
+    p.ylabel = "x_j"
 
     p.title = "Trace Plot of x_j"
 
@@ -47,16 +44,17 @@ object AdaptiveMetropolis:
 
   }
   
-  def one_AMRTH_step(state: AM_state, q: DenseMatrix[Double], r: DenseMatrix[Double]): AM_state = {
+  def one_AMRTH_step(state: AM_state, q: DenseMatrix[Double], r: DenseMatrix[Double], prog: Boolean): AM_state = {
 
     val j = state.j
     val x_sum = state.x_sum
     val xxt_sum = state.xxt_sum
     val x = state._4
 
-    if (j % 1000 == 0) {
+    // print progress every 1000 iterations if 'prog=true'
+    if (j % 1000 == 0 && prog) {
       print("\n   Running: " + j + "th iteration\n")
-      print("   Completed " + j/100000 + "%\n")
+      //print("   Completed " + j/10000 + "%\n")
       val runtime = Runtime.getRuntime()
       print(s"** Used Memory (MB): ${(runtime.totalMemory-runtime.freeMemory)/(1048576)}")
     }
@@ -111,40 +109,51 @@ object AdaptiveMetropolis:
 
   }
 
-  def AMRTH(state0: AM_state, sigma: DenseMatrix[Double]): LazyList[AM_state] = {
+  def AMRTH(state0: AM_state, sigma: DenseMatrix[Double], prog: Boolean): LazyList[AM_state] = {
 
     val qr.QR(q,r) = qr(sigma)
 
-    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, q, r))
+    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, q, r, prog))
   }
 
   @main def run(): Unit =
 
-    val d = 5
+    // dimension of the state space
+    val d = 25
 
+    // create a chaotic variance to target
     val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
-  
     val M = DenseMatrix(data: _*)
     val sigma = M.t * M
 
+    // initial state
     val state0 = AM_state(0.0, DenseVector.zeros[Double](d), DenseMatrix.eye[Double](d), DenseVector.zeros[Double](d))
 
-    val n: Int = 1000000
+    val n: Int = 10000 // size of the desired sample
+    val burnin: Int = 10000
+    val thinrate: Int = 10
+    // The actual number of iterations computed is n/thin + burnin
 
-    val amrth_sample = thin(AMRTH(state0, sigma).map(_.x).drop(1000),10).take(n)
+    val amrth_sample = thin(AMRTH(state0, sigma, true).map(_.x).drop(burnin),thinrate).take(n).toArray
 
+    // Empirical Variance matrix of the sample
     val sigma_j = cov(DenseMatrix(amrth_sample: _*))
 
-    //val eigvalues = eig(sqrtm(sigma_j)*sqrtm(inv(sigma))).eigenvalues
+    val eigsigmaj = eig(sigma_j).eigenvalues
+    val eigsigma  = eig(sigma).eigenvalues
 
-    //val eigminussquare = eigvalues.map(1/(_*_))
+    val lambda = sqrt(eigsigmaj) *:* sqrt(eigsigma).map(x => 1/x)
 
-    //val eiginv = eigvalues.map(1/_)
+    val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
+    val lambdainvsum = sum(lambda.map(x => 1/x))
 
-    //val b = d * ((eigminussquare.sum)/((eiginv.sum)*(eiginv.sum)))
+    // According to Roberts and Rosenthal, this should go to 1 at the stationary distribution
+    val b = d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))
 
     print("\nThe true variance of x_1 value is\n" + sigma(1,1))
 
     print("\n\nThe Empirical sigma value is\n" + sigma_j(1,1))
 
-    // plotter(amrth_sample.map((x: AM_state) => x.x), n, 0, "./exports/adaptive_trace.png")
+    print("\n The b value is " + b)
+
+    plotter(amrth_sample, 0, "./exports/adaptive_trace.png")
