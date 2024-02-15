@@ -6,7 +6,6 @@ import breeze.linalg._
 import breeze.numerics._
 import breeze.stats.distributions._
 import breeze.stats.distributions.Rand.FixedSeed.randBasis
-import java.util.concurrent.ThreadLocalRandom
 
 import AdaptiveMetropolis._
 

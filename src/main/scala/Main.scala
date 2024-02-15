@@ -5,6 +5,9 @@ import breeze.stats.distributions._
 //import breeze.stats.distributions.Rand.FixedSeed.randBasis
 import org.apache.commons.math3.random.MersenneTwister
 
+implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(42L)))
+
+
 case class AM_state(j: Double, 
                     x_sum: DenseVector[Double], 
                     xxt_sum: DenseMatrix[Double],
@@ -13,6 +16,13 @@ case class AM_state(j: Double,
 
 
 object AdaptiveMetropolis:
+
+  // updated from Darren's scala course, github.com/darrenjw/scala-course
+  def thin[T](chain:LazyList[T], th: Int): LazyList[T] = {
+    val droppedchain = chain.drop(th - 1)
+    if (droppedchain.isEmpty) LazyList.empty else
+      droppedchain.head #:: thin(droppedchain.tail, th)
+  }
 
   def plotter(sample: LazyList[DenseVector[Double]], 
               n: Int, 
@@ -37,14 +47,19 @@ object AdaptiveMetropolis:
 
   }
   
-  def one_AMRTH_step(state: AM_state, q: DenseMatrix[Double], r: DenseMatrix[Double], seed: Long): AM_state = {
-
-    implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(seed)))
+  def one_AMRTH_step(state: AM_state, q: DenseMatrix[Double], r: DenseMatrix[Double]): AM_state = {
 
     val j = state.j
     val x_sum = state.x_sum
     val xxt_sum = state.xxt_sum
     val x = state._4
+
+    if (j % 1000 == 0) {
+      print("\n   Running: " + j + "th iteration\n")
+      print("   Completed " + j/100000 + "%\n")
+      val runtime = Runtime.getRuntime()
+      print(s"** Used Memory (MB): ${(runtime.totalMemory-runtime.freeMemory)/(1048576)}")
+    }
 
     val d = x.length
 
@@ -96,20 +111,16 @@ object AdaptiveMetropolis:
 
   }
 
-  def AMRTH(state0: AM_state, sigma: DenseMatrix[Double], seed: Long): LazyList[AM_state] = {
+  def AMRTH(state0: AM_state, sigma: DenseMatrix[Double]): LazyList[AM_state] = {
 
     val qr.QR(q,r) = qr(sigma)
 
-    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, q, r, seed + state.j.toLong))
+    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, q, r))
   }
 
   @main def run(): Unit =
 
-    val seed: Long = 42L
-
-    implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(seed)))
-
-    val d = 25
+    val d = 5
 
     val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
   
@@ -118,14 +129,11 @@ object AdaptiveMetropolis:
 
     val state0 = AM_state(0.0, DenseVector.zeros[Double](d), DenseMatrix.eye[Double](d), DenseVector.zeros[Double](d))
 
-    val amrth_sample = AMRTH(state0, sigma, seed)
+    val n: Int = 1000000
 
-    val n: Int = 100000
+    val amrth_sample = thin(AMRTH(state0, sigma).map(_.x).drop(1000),10).take(n)
 
-    val xxt_sum = amrth_sample(n).xxt_sum
-    val x_sum = amrth_sample(n).x_sum
-    
-    val sigma_j = (xxt_sum / n.toDouble) - ((x_sum * x_sum.t) / (n*n).toDouble)
+    val sigma_j = cov(DenseMatrix(amrth_sample: _*))
 
     //val eigvalues = eig(sqrtm(sigma_j)*sqrtm(inv(sigma))).eigenvalues
 
