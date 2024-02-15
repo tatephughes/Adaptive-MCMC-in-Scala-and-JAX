@@ -12,6 +12,8 @@ This is based on the example from the article "Examples of Adaptive MCMC" by Bob
 We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma = M \in \mathbb R^{d\times d}$ is a matrix with random $\mathcal N[0,1]$ entries. Let's refresh how to use matrices in Scala by generating this matrix;
 
 #+begin_src scala
+  //silent
+  
   import AdaptiveMetropolis._
 
   // dimension of the state space
@@ -43,6 +45,7 @@ The core of the algorithm is this. ~one_AMRTH_step~ takes the current state as w
 
 #+begin_src scala
   //noeval
+  
   case class AM_state(j: Double,
     x_sum: DenseVector[Double],
     xxt_sum: DenseMatrix[Double],
@@ -124,6 +127,7 @@ and we can test the algorithm with
 
 #+begin_src scala
   //silent
+  
   // initial state
   val state0 = AM_state(0.0, DenseVector.zeros[Double](d), DenseMatrix.eye[Double](d), DenseVector.zeros[Double](d))
 
@@ -162,12 +166,13 @@ $$\begin{aligned}
 b = d\frac{\sum \lambda_i^{-2}}{(\sum \lambda_i^{-1})^2 }
 \end{aligned}$$
 
-where $\lambda_i$ are the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$, where $\Sigma_p$ is the empirical variance matrix at the pth iteration.
+where $\lambda_i$ are the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ where $\Sigma_p$ is the empirical variance matrix at the pth iteration.
 
 We compute this value as follows;
 
 #+begin_src scala
   //silent
+  
   val eigsigmaj = eig(sigma_j).eigenvalues
   val eigsigma  = eig(sigma).eigenvalues
 
