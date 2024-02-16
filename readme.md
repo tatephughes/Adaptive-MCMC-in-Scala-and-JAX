@@ -1,11 +1,11 @@
-- [The toy problem](#org1d0285c)
+- [The toy problem](#org3b06583)
 
 This is my attempt at implementing Adaptive Metropolis (or, as I prefer, Adaptive MRTH) in scala, using the breeze library.
 
 This is based on the example from the article "Examples of Adaptive MCMC" by Boberts and Rosenthal.
 
 
-<a id="org1d0285c"></a>
+<a id="org3b06583"></a>
 
 # The toy problem
 
@@ -34,7 +34,7 @@ A AMRTH step is defined as follows;
 
 We can compute the empirical covariance matrix at step $j$ by
 
-$$\begin{aligned} \Sigma_j=\frac{{\sum_{i=0}^{j}} x_ix_i^{\intercal}}{j} - \frac{({\sum_{i=0}^{j}} x_i)({\sum_{i=0}^{j}} x_i)^{\intercal}}{j^2}. \end{aligned}$$
+$$\begin{aligned} \Sigma_j=\frac{{\sum_{i=0}^j} x_ix_i^{\intercal}}{j} - \frac{({\sum_{i=0}^j} x_i)({\sum_{i=0}^j} x_i)^{\intercal}}{j^2}. \end{aligned}$$
 
 The logic I'm using is to carry forward $\sum x_ix_i^{\intercal}$ and $\sum x_i$ (as well as the current index, $j$) as part of our 'chain', in order to compute the empirical covariance matrix as we go along (I should possibly do a $\frac{n}{n-1}$ transormation to this matrix too), in order to sample from the proposal when $j>2d$ .
 
