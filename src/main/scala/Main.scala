@@ -12,16 +12,16 @@ case class AM_state(j: Double,
                     xxt_sum: DenseMatrix[Double],
                     x: DenseVector[Double])
 
-
+extension[T](ll: LazyList[T]){
+  // updated from Darren's scala course as an extension, github.com/darrenjw/scala-course
+  def thin(th: Int): LazyList[T] = {
+    val lld = ll.drop(th - 1)
+    if (lld.isEmpty) LazyList.empty else
+      lld.head #:: lld.tail.thin(th)
+  }
+}
 
 object AdaptiveMetropolis:
-
-  // updated from Darren's scala course, github.com/darrenjw/scala-course
-  def thin[T](chain:LazyList[T], th: Int): LazyList[T] = {
-    val droppedchain = chain.drop(th - 1)
-    if (droppedchain.isEmpty) LazyList.empty else
-      droppedchain.head #:: thin(droppedchain.tail, th)
-  }
 
   def plotter(sample: Array[DenseVector[Double]], // the sample to plot
               j: Int, // the coordinate to plot
@@ -52,7 +52,7 @@ object AdaptiveMetropolis:
 
     // print progress every 1000 iterations if 'prog=true'
     if (j % 1000 == 0 && prog) {
-      print("\n   Running: " + j + "th iteration\n")
+      print("\n   Running: " + j.toInt + "th iteration\n")
       //print("   Completed " + j/10000 + "%\n")
       val runtime = Runtime.getRuntime()
       print(s"** Used Memory (MB): ${(runtime.totalMemory-runtime.freeMemory)/(1048576)}")
@@ -133,7 +133,7 @@ object AdaptiveMetropolis:
     val thinrate: Int = 10
     // The actual number of iterations computed is n/thin + burnin
 
-    val amrth_sample = thin(AMRTH(state0, sigma, true).map(_.x).drop(burnin),thinrate).take(n).toArray
+    val amrth_sample = AMRTH(state0, sigma, true).thin(thinrate).drop(burnin).map(_.x).take(n).toArray
 
     // Empirical Variance matrix of the sample
     val sigma_j = cov(DenseMatrix(amrth_sample: _*))
