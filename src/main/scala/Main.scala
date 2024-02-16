@@ -23,7 +23,10 @@ extension[T](ll: LazyList[T]){
 
 object AdaptiveMetropolis:
 
-  def plotter(sample: Array[DenseVector[Double]], // the sample to plot
+  type dm = DenseMatrix[Double]
+  type dv = DenseVector[Double]
+
+  def plotter(sample: Array[dv], // the sample to plot
               j: Int, // the coordinate to plot
               file_path: String): Unit = {
 
@@ -43,7 +46,7 @@ object AdaptiveMetropolis:
 
   }
   
-  def one_AMRTH_step(state: AM_state, q: DenseMatrix[Double], r: DenseMatrix[Double], prog: Boolean): AM_state = {
+  def one_AMRTH_step(state: AM_state, q: dm, r: dm, prog: Boolean): AM_state = {
 
     val j = state.j
     val x_sum = state.x_sum
@@ -108,7 +111,7 @@ object AdaptiveMetropolis:
 
   }
 
-  def AMRTH(state0: AM_state, sigma: DenseMatrix[Double], prog: Boolean): LazyList[AM_state] = {
+  def AMRTH(state0: AM_state, sigma: dm, prog: Boolean): LazyList[AM_state] = {
 
     val qr.QR(q,r) = qr(sigma)
 
@@ -126,7 +129,10 @@ object AdaptiveMetropolis:
     val sigma = M.t * M
 
     // initial state
-    val state0 = AM_state(0.0, DenseVector.zeros[Double](d), DenseMatrix.eye[Double](d), DenseVector.zeros[Double](d))
+    val state0 = AM_state(0.0,
+                          DenseVector.zeros[Double](d),
+                          DenseMatrix.eye[Double](d),
+                          DenseVector.zeros[Double](d))
 
     val n: Int = 100000 // size of the desired sample
     val burnin: Int = 100000
