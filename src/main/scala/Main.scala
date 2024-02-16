@@ -56,7 +56,6 @@ object AdaptiveMetropolis:
     // print progress every 1000 iterations if 'prog=true'
     if (j % 1000 == 0 && prog) {
       print("\n   Running: " + j.toInt + "th iteration\n")
-      //print("   Completed " + j/10000 + "%\n")
       val runtime = Runtime.getRuntime()
       print(s"** Used Memory (MB): ${(runtime.totalMemory-runtime.freeMemory)/(1048576)}")
     }
