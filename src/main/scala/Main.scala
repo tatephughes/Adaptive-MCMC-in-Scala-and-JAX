@@ -120,7 +120,7 @@ object AdaptiveMetropolis:
   @main def run(): Unit =
 
     // dimension of the state space
-    val d = 25
+    val d = 100
 
     // create a chaotic variance to target
     val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
@@ -133,12 +133,12 @@ object AdaptiveMetropolis:
                           DenseMatrix.eye[Double](d),
                           DenseVector.zeros[Double](d))
 
-    val n: Int = 100000 // size of the desired sample
+    val n: Int = 1000 // size of the desired sample
     val burnin: Int = 100000
-    val thinrate: Int = 10
-    // The actual number of iterations computed is n/thin + burnin
+    val thinrate: Int = 100
+    // The actual number of iterations computed is n*thin + burnin
 
-    val amrth_sample = AMRTH(state0, sigma, true).thin(thinrate).drop(burnin).map(_.x).take(n).toArray
+    val amrth_sample = AMRTH(state0, sigma, true).drop(burnin).thin(thinrate).map(_.x).take(n).toArray
 
     // Empirical Variance matrix of the sample
     val sigma_j = cov(DenseMatrix(amrth_sample: _*))
