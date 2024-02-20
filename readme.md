@@ -1,11 +1,12 @@
-- [The toy problem](#org3b06583)
+- [The toy problem](#org26426e3)
+    - [Formalise this loose logic a little bit, the $b$ I'm computing is not the same as the $b$ in the paper](#orgbbb5855)
 
 This is my attempt at implementing Adaptive Metropolis (or, as I prefer, Adaptive MRTH) in scala, using the breeze library.
 
 This is based on the example from the article "Examples of Adaptive MCMC" by Boberts and Rosenthal.
 
 
-<a id="org3b06583"></a>
+<a id="org26426e3"></a>
 
 # The toy problem
 
@@ -167,6 +168,17 @@ where $\lambda_i$ are the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ where $\S
 
 $b$ should approach 1 as the chain approaches the stationary distribution. Roughly, it measures the difference between the empirical and true variance matrices.
 
+Of course, getting the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ isn't too trivial, since we probably don't want to compute these matrices directly. Luckily, since we have completely non-negative eigenvalues (from being variance matrices), we can use the following
+
+-   If $\lambda$ is an eigenvalue of $A$, then $\lambda^{1/2}$ is an eigenvalue of $A^{1/2}$
+-   If $\lambda$ is an eigenvalue of $A$, then $\lambda^{-1}$ is an eigenvalue of $A^{-1}$
+-   NOT TRUE in general [if $\lambda,\mu$ are eigenvalues of $A$ and $B$ respectively, then $\lambda\mu$ is an eigenvalue of $AB$] (gets closer as eigenvalues get closer, that's why it still kind of works)
+
+
+<a id="orgbbb5855"></a>
+
+### TODO Formalise this loose logic a little bit, the $b$ I'm computing is not the same as the $b$ in the paper
+
 We compute this value as follows;
 
 ```scala
@@ -180,7 +192,7 @@ val lambda = sqrt(eigsigmaj) *:* sqrt(eigsigma).map(x => 1/x)
 val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
 val lambdainvsum = sum(lambda.map(x => 1/x))
 
-// According to Roberts and Rosenthal, this should go to 1 at the stationary distribution
+// According to Roberts and Rosenthal (kind of), this should go to 1 at the stationary distribution
 val b = d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))
 ```
 
