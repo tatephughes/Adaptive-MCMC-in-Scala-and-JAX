@@ -54,7 +54,7 @@ object AdaptiveMetropolis:
     val x = state._4
 
     // print progress every 1000 iterations if 'prog=true'
-    if (j % 1000 == 0 && prog) {
+    if (prog && j % 1000 == 0) {
       print("\n   Running: " + j.toInt + "th iteration\n")
       val runtime = Runtime.getRuntime()
       print(s"** Used Memory (MB): ${(runtime.totalMemory-runtime.freeMemory)/(1048576)}")
@@ -133,8 +133,8 @@ object AdaptiveMetropolis:
                           DenseMatrix.eye[Double](d),
                           DenseVector.zeros[Double](d))
 
-    val n: Int = 1000 // size of the desired sample
-    val burnin: Int = 100000
+    val n: Int = 10000 // size of the desired sample
+    val burnin: Int = 1000000
     val thinrate: Int = 100
     // The actual number of iterations computed is n*thin + burnin
 
@@ -143,10 +143,15 @@ object AdaptiveMetropolis:
     // Empirical Variance matrix of the sample
     val sigma_j = cov(DenseMatrix(amrth_sample: _*))
 
-    val eigsigmaj = eig(sigma_j).eigenvalues
-    val eigsigma  = eig(sigma).eigenvalues
+    val sigma_jdecomp = eig(sigma_j)
+    val sigma_decomp = eig(sigma)
 
-    val lambda = sqrt(eigsigmaj) *:* sqrt(eigsigma).map(x => 1/x)
+    val rootsigmaj = sigma_jdecomp.eigenvectors * diag(sqrt(sigma_jdecomp.eigenvalues)) * inv(sigma_jdecomp.eigenvectors)
+    val rootsigmainv  = inv(sigma_decomp.eigenvectors * diag(sqrt(sigma_decomp.eigenvalues)) * inv(sigma_decomp.eigenvectors))
+
+    val lambda = eig(rootsigmaj * rootsigmainv).eigenvalues
+
+    //val lambda = sqrt(eigsigmaj) *:* sqrt(eigsigma).map(x => 1/x)
 
     val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
     val lambdainvsum = sum(lambda.map(x => 1/x))

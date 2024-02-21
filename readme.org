@@ -171,7 +171,7 @@ where $\lambda_i$ are the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ where $\S
 $b$ should approach 1 as the chain approaches the stationary distribution. Roughly, it measures the difference between the empirical and true variance matrices.
 
 Of course, getting the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ isn't too trivial, since we probably don't want to compute these matrices directly. Luckily, since we have completely non-negative eigenvalues (from being variance matrices), we can use the following
-
+co
 - If $\lambda$ is an eigenvalue of $A$, then $\lambda^{1/2}$ is an eigenvalue of $A^{1/2}$
 - If $\lambda$ is an eigenvalue of $A$, then $\lambda^{-1}$ is an eigenvalue of $A^{-1}$
 - NOT TRUE in general [if $\lambda,\mu$ are eigenvalues of $A$ and $B$ respectively, then $\lambda\mu$ is an eigenvalue of $AB$] (gets closer as eigenvalues get closer, that's why it still kind of works)
@@ -200,3 +200,15 @@ We compute this value as follows;
 #+end_src
 
 I get a value of $b\approx 1.000014612$, so it seems to be working.
+
+
+For ~d=100~, ~n=10000~, ~burnin = 1000000~, and ~thinrate=100~, I get 
+
+The true variance of x_1 value is
+87.24837703682367
+
+The Empirical sigma value is
+85.1683515513272
+The b value is 1.0035610613506012
+
+Which seems pretty good!

@@ -1,12 +1,12 @@
-- [The toy problem](#org26426e3)
-    - [Formalise this loose logic a little bit, the $b$ I'm computing is not the same as the $b$ in the paper](#orgbbb5855)
+- [The toy problem](#org0cc9889)
+    - [Formalise this loose logic a little bit, the $b$ I'm computing is not the same as the $b$ in the paper](#org5ee48ba)
 
 This is my attempt at implementing Adaptive Metropolis (or, as I prefer, Adaptive MRTH) in scala, using the breeze library.
 
 This is based on the example from the article "Examples of Adaptive MCMC" by Boberts and Rosenthal.
 
 
-<a id="org26426e3"></a>
+<a id="org0cc9889"></a>
 
 # The toy problem
 
@@ -168,14 +168,14 @@ where $\lambda_i$ are the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ where $\S
 
 $b$ should approach 1 as the chain approaches the stationary distribution. Roughly, it measures the difference between the empirical and true variance matrices.
 
-Of course, getting the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ isn't too trivial, since we probably don't want to compute these matrices directly. Luckily, since we have completely non-negative eigenvalues (from being variance matrices), we can use the following
+Of course, getting the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ isn't too trivial, since we probably don't want to compute these matrices directly. Luckily, since we have completely non-negative eigenvalues (from being variance matrices), we can use the following co
 
 -   If $\lambda$ is an eigenvalue of $A$, then $\lambda^{1/2}$ is an eigenvalue of $A^{1/2}$
 -   If $\lambda$ is an eigenvalue of $A$, then $\lambda^{-1}$ is an eigenvalue of $A^{-1}$
 -   NOT TRUE in general [if $\lambda,\mu$ are eigenvalues of $A$ and $B$ respectively, then $\lambda\mu$ is an eigenvalue of $AB$] (gets closer as eigenvalues get closer, that's why it still kind of works)
 
 
-<a id="orgbbb5855"></a>
+<a id="org5ee48ba"></a>
 
 ### TODO Formalise this loose logic a little bit, the $b$ I'm computing is not the same as the $b$ in the paper
 
@@ -201,3 +201,11 @@ print("\n The b value is " + b)
 ```
 
 I get a value of $b\approx 1.000014612$, so it seems to be working.
+
+For `d=100`, `n=10000`, `burnin = 1000000`, and `thinrate=100`, I get
+
+The true variance of x<sub>1</sub> value is 87.24837703682367
+
+The Empirical sigma value is 85.1683515513272 The b value is 1.0035610613506012
+
+Which seems pretty good!
