@@ -5,7 +5,7 @@
 
 This is my attempt at implementing Adaptive Metropolis (or, as I prefer, Adaptive MRTH) in scala, using the breeze library.
 
-This is based on the example from the article "Examples of Adaptive MCMC" by Boberts and Rosenthal.
+This is based on the example from the article "Examples of Adaptive MCMC" by Roberts and Rosenthal.
 
 * The toy problem
 

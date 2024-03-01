@@ -151,8 +151,6 @@ object AdaptiveMetropolis:
 
     val lambda = eig(rootsigmaj * rootsigmainv).eigenvalues
 
-    //val lambda = sqrt(eigsigmaj) *:* sqrt(eigsigma).map(x => 1/x)
-
     val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
     val lambdainvsum = sum(lambda.map(x => 1/x))
 
