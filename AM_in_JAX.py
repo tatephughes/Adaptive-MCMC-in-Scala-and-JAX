@@ -14,9 +14,9 @@ class Adaptive_State:
     def __init__(self, j, x, x_sum, xxt_sum):
 
         self.j       = j
+        self.x       = x  
         self.x_sum   = x_sum
         self.xxt_sum = xxt_sum
-        self.x       = x
 
     def accept(self, prop, alpha, key):
 
@@ -25,7 +25,7 @@ class Adaptive_State:
         u = rand.uniform(key)
 
         new_x = prop if (jnp.log(u) < log_prob) else self.x
-
+        
         return(Adaptive_State(
             self.j + 1,
             new_x,
@@ -37,9 +37,9 @@ class Adaptive_State:
         keys = rand.split(key,3)
         
         j       = self.j
+        x       = self.x
         x_sum   = self.x_sum
         xxt_sum = self.xxt_sum
-        x       = self.x
         d       = x.shape[0]
 
         if (j <= 2*d):
@@ -60,8 +60,11 @@ class Adaptive_State:
             emp_var = xxt_sum/j - jnp.outer(x_sum, x_sum.T)/j**2
 
             u = rand.uniform(keys[0])
-            
-            prop = rand.multivariate_normal(keys[1], x, emp_var * (2.38**2/d)) if (u < 0.95)  else ((rand.normal(keys[1], shape=(d,)) + x) * 100 * d)
+
+            if (u < 0.95):
+              prop = rand.multivariate_normal(keys[1], x, emp_var * (2.38**2/d))
+            else:
+              prop = ((rand.normal(keys[1], shape=(d,)) + x) * 100 * d)
 
             # Compute the log acceptance probability
             alpha = 0.5 * (x @ (solve(r, q.T @ x))

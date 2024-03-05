@@ -25,10 +25,11 @@ from jax.numpy.linalg import solve, qr
 import jax
 #+end_src
 
-** Initialise key
-
-
 * State Class definition
+
+The Adaptive State class will contain a state of the chain as wll as a method to progress the state of the chain.
+
+It has three attributes;
 
 #+begin_src python :results none
 class Adaptive_State:
@@ -36,13 +37,15 @@ class Adaptive_State:
     def __init__(self, j, x, x_sum, xxt_sum):
 
         self.j       = j
+        self.x       = x  
         self.x_sum   = x_sum
         self.xxt_sum = xxt_sum
-        self.x       = x  
+
 #+end_src
 
-
 * ~accept~ function
+
+The ~accept~ method decides whether to accept a given proposed move, given the log-probability and a prng key.
 
 #+begin_src python :results none
     def accept(self, prop, alpha, key):
@@ -52,7 +55,7 @@ class Adaptive_State:
         u = rand.uniform(key)
 
         new_x = prop if (jnp.log(u) < log_prob) else self.x
-
+        
         return(Adaptive_State(
             self.j + 1,
             new_x,
@@ -61,8 +64,9 @@ class Adaptive_State:
     
 #+end_src
 
-
 * ~oneStep~ function
+
+The main chunk, using the algorithm from Roberts and Rosenthall to make a single step to the next state.
 
 #+begin_src python :results none
     def oneStep(self, q, r, key):
@@ -70,9 +74,9 @@ class Adaptive_State:
         keys = rand.split(key,3)
         
         j       = self.j
+        x       = self.x
         x_sum   = self.x_sum
         xxt_sum = self.xxt_sum
-        x       = self.x
         d       = x.shape[0]
 
         if (j <= 2*d):
@@ -93,8 +97,11 @@ class Adaptive_State:
             emp_var = xxt_sum/j - jnp.outer(x_sum, x_sum.T)/j**2
 
             u = rand.uniform(keys[0])
-            
-            prop = rand.multivariate_normal(keys[1], x, emp_var * (2.38**2/d)) if (u < 0.95)  else ((rand.normal(keys[1], shape=(d,)) + x) * 100 * d)
+
+            if (u < 0.95):
+              prop = rand.multivariate_normal(keys[1], x, emp_var * (2.38**2/d))
+            else:
+              prop = ((rand.normal(keys[1], shape=(d,)) + x) * 100 * d)
 
             # Compute the log acceptance probability
             alpha = 0.5 * (x @ (solve(r, q.T @ x))
@@ -103,6 +110,8 @@ class Adaptive_State:
             return(self.accept(prop, alpha, keys[2]))
             
 #+end_src
+
+
 
 * Testing
 
@@ -122,30 +131,32 @@ from AM_in_JAX import Adaptive_State
 
 x0 = Adaptive_State(1,jnp.array([0,0]),jnp.array([0,0]), jnp.array([[1,0],[0,1]]))
 
-results = [x0]
-
 sigma = jnp.array([[2,1],[1,2]])
-
 Q, R = qr(sigma)
 
 key = jax.random.PRNGKey(seed=1)
-
-n = 1000
-
 keys = rand.split(key, n)
 
-for i in range(n): results.append(results[-1].oneStep(Q,R,keys[i]))
+n = 1000
+thinrate = 10
+burnin = 1000
 
-sample = [state.x for state in results]
+# Now i want to do an iterate, but I'm struggling to think of how to do this without for loops!
 
-emp_var = results[n-1].xxt_sum/n - jnp.outer(results[n-1].x_sum, results[n-1].x_sum.T)/n**2
+# I could use the scan operation 
+'''
+def step(carry, _):
+    return(carry.oneStep(Q,R, keys[carry.j]), None)
 
-print(emp_var)
+_, results = jl.scan(step, x0, jnp.zeros(n))
+
+results[-1].x
+'''
+# But Adaptive_State is not a valid JAX type. I could rewrite to not use a custom class, of course, but I'd rather not do that.
+
+# Thinning and burnin can be done with [::thinrate] and [burnin:] I think?
 #+end_src
 
-#+RESULTS:
-: [[2.098498  1.1004199]
-:  [1.1004199 1.8999906]]
 
 
 

@@ -1,20 +1,19 @@
-- [Boilerplate](#org371815c)
-  - [Shabang](#orgfafad14)
-  - [Imports](#org5593541)
-  - [Initialise key](#org1d6c7c6)
-- [State Class definition](#org19736e8)
-- [`accept` function](#org38512e2)
-- [`oneStep` function](#org8e5fda3)
-- [Testing](#orgc606726)
+- [Boilerplate](#orgc86c168)
+  - [Shabang](#orgd4ecd29)
+  - [Imports](#org199914f)
+- [State Class definition](#org8b75c0b)
+- [`accept` function](#org29292eb)
+- [`oneStep` function](#orgf06e925)
+- [Testing](#orge704d2a)
 
 
 
-<a id="org371815c"></a>
+<a id="orgc86c168"></a>
 
 # Boilerplate
 
 
-<a id="orgfafad14"></a>
+<a id="orgd4ecd29"></a>
 
 ## Shabang
 
@@ -23,7 +22,7 @@
 ```
 
 
-<a id="org5593541"></a>
+<a id="org199914f"></a>
 
 ## Imports
 
@@ -39,14 +38,13 @@ import jax
 ```
 
 
-<a id="org1d6c7c6"></a>
-
-## Initialise key
-
-
-<a id="org19736e8"></a>
+<a id="org8b75c0b"></a>
 
 # State Class definition
+
+The Adaptive State class will contain a state of the chain as wll as a method to progress the state of the chain.
+
+It has three attributes;
 
 ```python
 class Adaptive_State:
@@ -54,15 +52,18 @@ class Adaptive_State:
     def __init__(self, j, x, x_sum, xxt_sum):
 
         self.j       = j
+        self.x       = x  
         self.x_sum   = x_sum
         self.xxt_sum = xxt_sum
-        self.x       = x  
+
 ```
 
 
-<a id="org38512e2"></a>
+<a id="org29292eb"></a>
 
 # `accept` function
+
+The `accept` method decides whether to accept a given proposed move, given the log-probability and a prng key.
 
 ```python
     def accept(self, prop, alpha, key):
@@ -72,7 +73,7 @@ class Adaptive_State:
         u = rand.uniform(key)
 
         new_x = prop if (jnp.log(u) < log_prob) else self.x
-
+        
         return(Adaptive_State(
             self.j + 1,
             new_x,
@@ -82,9 +83,11 @@ class Adaptive_State:
 ```
 
 
-<a id="org8e5fda3"></a>
+<a id="orgf06e925"></a>
 
 # `oneStep` function
+
+The main chunk, using the algorithm from Roberts and Rosenthall to make a single step to the next state.
 
 ```python
     def oneStep(self, q, r, key):
@@ -92,9 +95,9 @@ class Adaptive_State:
         keys = rand.split(key,3)
         
         j       = self.j
+        x       = self.x
         x_sum   = self.x_sum
         xxt_sum = self.xxt_sum
-        x       = self.x
         d       = x.shape[0]
 
         if (j <= 2*d):
@@ -115,8 +118,11 @@ class Adaptive_State:
             emp_var = xxt_sum/j - jnp.outer(x_sum, x_sum.T)/j**2
 
             u = rand.uniform(keys[0])
-            
-            prop = rand.multivariate_normal(keys[1], x, emp_var * (2.38**2/d)) if (u < 0.95)  else ((rand.normal(keys[1], shape=(d,)) + x) * 100 * d)
+
+            if (u < 0.95):
+              prop = rand.multivariate_normal(keys[1], x, emp_var * (2.38**2/d))
+            else:
+              prop = ((rand.normal(keys[1], shape=(d,)) + x) * 100 * d)
 
             # Compute the log acceptance probability
             alpha = 0.5 * (x @ (solve(r, q.T @ x))
@@ -127,7 +133,7 @@ class Adaptive_State:
 ```
 
 
-<a id="orgc606726"></a>
+<a id="orge704d2a"></a>
 
 # Testing
 
@@ -147,23 +153,28 @@ from AM_in_JAX import Adaptive_State
 
 x0 = Adaptive_State(1,jnp.array([0,0]),jnp.array([0,0]), jnp.array([[1,0],[0,1]]))
 
-results = [x0]
-
 sigma = jnp.array([[2,1],[1,2]])
-
 Q, R = qr(sigma)
 
 key = jax.random.PRNGKey(seed=1)
-
-n = 1000
-
 keys = rand.split(key, n)
 
-for i in range(n): results.append(results[-1].oneStep(Q,R,keys[i]))
+n = 1000
+thinrate = 10
+burnin = 1000
 
-sample = [state.x for state in results]
+# Now i want to do an iterate, but I'm struggling to think of how to do this without for loops!
 
-emp_var = results[n-1].xxt_sum/n - jnp.outer(results[n-1].x_sum, results[n-1].x_sum.T)/n**2
+# I could use the scan operation 
+'''
+def step(carry, _):
+    return(carry.oneStep(Q,R, keys[carry.j]), None)
 
-print(emp_var)
+_, results = jl.scan(step, x0, jnp.zeros(n))
+
+results[-1].x
+'''
+# But Adaptive_State is not a valid JAX type. I could rewrite to not use a custom class, of course, but I'd rather not do that.
+
+# Thinning and burnin can be done with [::thinrate] and [burnin:] I think?
 ```
