@@ -9,65 +9,89 @@ from jax import vmap
 from jax.numpy.linalg import solve, qr
 import jax
 
-class Adaptive_State:
+def accept(state, prop, alpha, key):
 
-    def __init__(self, j, x, x_sum, xxt_sum):
+  j       = state[0]
+  x       = state[1]
+  x_sum   = state[2]
+  xxt_sum = state[3]
+  d       = x.shape[0]
+  
+  log_prob = jnp.minimum(0.0, alpha)
 
-        self.j       = j
-        self.x       = x  
-        self.x_sum   = x_sum
-        self.xxt_sum = xxt_sum
+  u = rand.uniform(key)
 
-    def accept(self, prop, alpha, key):
+  #new_x = prop if (jnp.log(u) < log_prob) else x
 
-        log_prob = jnp.minimum(0.0, alpha)
+  new_x = jl.cond((jnp.log(u) < log_prob),
+                  _,
+                  lambda _: prop,
+                  _,
+                  lambda _: x)
+  
+  return((j + 1,
+          new_x,
+          x_sum + new_x,
+          xxt_sum + jnp.outer(new_x, new_x)))
 
-        u = rand.uniform(key)
+def initStep(state,q,r,key):
 
-        new_x = prop if (jnp.log(u) < log_prob) else self.x
-        
-        return(Adaptive_State(
-            self.j + 1,
-            new_x,
-            self.x_sum + new_x,
-            self.xxt_sum + jnp.outer(new_x, new_x)))
+    j       = state[0]
+    x       = state[1]
+    x_sum   = state[2]
+    xxt_sum = state[3]
+    d       = x.shape[0]
 
-    def oneStep(self, q, r, key):
+    keys = rand.split(key,3)
+    z = rand.normal(keys[0], shape=(d,))
+    
+    # The propasal distribution is N(x,1/d) for this first stage
+    prop = (z + x) * d
+    
+    # Compute the log acceptance probability
+    alpha = 0.5 * (x @ (solve(r, q.T @ x))
+                   - (prop @ solve(r, q.T @ prop)))
+    
+    return(accept(state, prop, alpha, keys[1]))
 
-        keys = rand.split(key,3)
-        
-        j       = self.j
-        x       = self.x
-        x_sum   = self.x_sum
-        xxt_sum = self.xxt_sum
-        d       = x.shape[0]
+def adaptStep(state, q, r, key):
 
-        if (j <= 2*d):
+    j       = state[0]
+    x       = state[1]
+    x_sum   = state[2]
+    xxt_sum = state[3]
+    d       = x.shape[0]
 
-            z = rand.normal(keys[0], shape=(d,))
+    keys = rand.split(key,3)
+    z = rand.normal(keys[0], shape=(d,))
+    
+    emp_var = xxt_sum/j - jnp.outer(x_sum, x_sum.T)/j**2
 
-            # The propasal distribution is N(x,1/d) for this first stage
-            prop = (z + x) * d
+    u = rand.uniform(keys[0])
 
-            # Compute the log acceptance probability
-            alpha = 0.5 * (x @ (solve(r, q.T @ x))
-                           - (prop @ solve(r, q.T @ prop)))
-            
-            return(self.accept(prop, alpha, keys[1]))
-        
-        else:
-            
-            emp_var = xxt_sum/j - jnp.outer(x_sum, x_sum.T)/j**2
+    prop = jl.cond(u < 0.95,
+                   x,
+                   lambda y: rand.multivariate_normal(keys[1], y,
+                                                 emp_var * (2.38**2/d)),
+                   x,
+                   lambda y:((rand.normal(keys[1], shape=(d,)) + y) * 100 * d))
+    
+    # Compute the log acceptance probability
+    alpha = 0.5 * (x @ (solve(r, q.T @ x))
+                   - (prop @ solve(r, q.T @ prop)))
+    
+    return(accept(state, prop, alpha, keys[2]))
 
-            u = rand.uniform(keys[0])
+def oneStep(state, q, r, key):
 
-            if (u < 0.95):
-              prop = rand.multivariate_normal(keys[1], x, emp_var * (2.38**2/d))
-            else:
-              prop = ((rand.normal(keys[1], shape=(d,)) + x) * 100 * d)
+    j       = state[0]
+    x       = state[1]
+    x_sum   = state[2]
+    xxt_sum = state[3]
+    d       = x.shape[0]
 
-            # Compute the log acceptance probability
-            alpha = 0.5 * (x @ (solve(r, q.T @ x))
-                           - (prop @ solve(r, q.T @ prop)))
-            
-            return(self.accept(prop, alpha, keys[2]))
+    return(jl.cond(j <= 2*d,
+                   _,
+                   lambda _: initStep(state, q, r, key),
+                   _,
+                   lambda _: adaptStep(state, q, r, key)))

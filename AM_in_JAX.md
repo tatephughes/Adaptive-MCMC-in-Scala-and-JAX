@@ -1,19 +1,21 @@
-- [Boilerplate](#orgc86c168)
-  - [Shabang](#orgd4ecd29)
-  - [Imports](#org199914f)
-- [State Class definition](#org8b75c0b)
-- [`accept` function](#org29292eb)
-- [`oneStep` function](#orgf06e925)
-- [Testing](#orge704d2a)
+- [Boilerplate](#orge8fe329)
+  - [Shabang](#org6e7881c)
+  - [Imports](#org1a25898)
+- [Reimplementation without classes](#org7bb2a80)
+  - [`accept` (non-class)](#orge7443aa)
+  - [`oneStep` (non-class)](#orgc97e46f)
+    - [Non-adaptive part](#orgbf87985)
+    - [Adaptive step](#orgd71a240)
+  - [Testing 2 electric boogaloo](#org702fdfc)
 
 
 
-<a id="orgc86c168"></a>
+<a id="orge8fe329"></a>
 
 # Boilerplate
 
 
-<a id="orgd4ecd29"></a>
+<a id="org6e7881c"></a>
 
 ## Shabang
 
@@ -22,7 +24,7 @@
 ```
 
 
-<a id="org199914f"></a>
+<a id="org1a25898"></a>
 
 ## Imports
 
@@ -38,143 +40,160 @@ import jax
 ```
 
 
-<a id="org8b75c0b"></a>
+<a id="org7bb2a80"></a>
 
-# State Class definition
+# Reimplementation without classes
 
-The Adaptive State class will contain a state of the chain as wll as a method to progress the state of the chain.
+Instead of an object oriented approach, let's assume that the `state` is a tuple with four elements, instead of it's own class.
 
-It has three attributes;
+More specificaly, `state = (j, x, x_sum, xxt_sum)`,
+
+
+<a id="orge7443aa"></a>
+
+## `accept` (non-class)
 
 ```python
-class Adaptive_State:
+def accept(state, prop, alpha, key):
 
-    def __init__(self, j, x, x_sum, xxt_sum):
+  j       = state[0]
+  x       = state[1]
+  x_sum   = state[2]
+  xxt_sum = state[3]
+  d       = x.shape[0]
+  
+  log_prob = jnp.minimum(0.0, alpha)
 
-        self.j       = j
-        self.x       = x  
-        self.x_sum   = x_sum
-        self.xxt_sum = xxt_sum
+  u = rand.uniform(key)
 
+  #new_x = prop if (jnp.log(u) < log_prob) else x
+
+  new_x = jl.cond((jnp.log(u) < log_prob),
+                  _,
+                  lambda _: prop,
+                  _,
+                  lambda _: x)
+  
+  return((j + 1,
+          new_x,
+          x_sum + new_x,
+          xxt_sum + jnp.outer(new_x, new_x)))
 ```
 
 
-<a id="org29292eb"></a>
+<a id="orgc97e46f"></a>
 
-# `accept` function
+## `oneStep` (non-class)
 
-The `accept` method decides whether to accept a given proposed move, given the log-probability and a prng key.
+
+<a id="orgbf87985"></a>
+
+### Non-adaptive part
 
 ```python
-    def accept(self, prop, alpha, key):
+def initStep(state,q,r,key):
 
-        log_prob = jnp.minimum(0.0, alpha)
+    j       = state[0]
+    x       = state[1]
+    x_sum   = state[2]
+    xxt_sum = state[3]
+    d       = x.shape[0]
 
-        u = rand.uniform(key)
-
-        new_x = prop if (jnp.log(u) < log_prob) else self.x
-        
-        return(Adaptive_State(
-            self.j + 1,
-            new_x,
-            self.x_sum + new_x,
-            self.xxt_sum + jnp.outer(new_x, new_x)))
+    keys = rand.split(key,3)
+    z = rand.normal(keys[0], shape=(d,))
+    
+    # The propasal distribution is N(x,1/d) for this first stage
+    prop = (z + x) * d
+    
+    # Compute the log acceptance probability
+    alpha = 0.5 * (x @ (solve(r, q.T @ x))
+                   - (prop @ solve(r, q.T @ prop)))
+    
+    return(accept(state, prop, alpha, keys[1]))
     
 ```
 
 
-<a id="orgf06e925"></a>
+<a id="orgd71a240"></a>
 
-# `oneStep` function
-
-The main chunk, using the algorithm from Roberts and Rosenthall to make a single step to the next state.
+### Adaptive step
 
 ```python
-    def oneStep(self, q, r, key):
+def adaptStep(state, q, r, key):
 
-        keys = rand.split(key,3)
-        
-        j       = self.j
-        x       = self.x
-        x_sum   = self.x_sum
-        xxt_sum = self.xxt_sum
-        d       = x.shape[0]
+    j       = state[0]
+    x       = state[1]
+    x_sum   = state[2]
+    xxt_sum = state[3]
+    d       = x.shape[0]
 
-        if (j <= 2*d):
+    keys = rand.split(key,3)
+    z = rand.normal(keys[0], shape=(d,))
+    
+    emp_var = xxt_sum/j - jnp.outer(x_sum, x_sum.T)/j**2
 
-            z = rand.normal(keys[0], shape=(d,))
+    u = rand.uniform(keys[0])
 
-            # The propasal distribution is N(x,1/d) for this first stage
-            prop = (z + x) * d
+    prop = jl.cond(u < 0.95,
+                   x,
+                   lambda y: rand.multivariate_normal(keys[1], y,
+                                                 emp_var * (2.38**2/d)),
+                   x,
+                   lambda y:((rand.normal(keys[1], shape=(d,)) + y) * 100 * d))
+    
+    # Compute the log acceptance probability
+    alpha = 0.5 * (x @ (solve(r, q.T @ x))
+                   - (prop @ solve(r, q.T @ prop)))
+    
+    return(accept(state, prop, alpha, keys[2]))
+```
 
-            # Compute the log acceptance probability
-            alpha = 0.5 * (x @ (solve(r, q.T @ x))
-                           - (prop @ solve(r, q.T @ prop)))
-            
-            return(self.accept(prop, alpha, keys[1]))
-        
-        else:
-            
-            emp_var = xxt_sum/j - jnp.outer(x_sum, x_sum.T)/j**2
+```python
+def oneStep(state, q, r, key):
 
-            u = rand.uniform(keys[0])
+    j       = state[0]
+    x       = state[1]
+    x_sum   = state[2]
+    xxt_sum = state[3]
+    d       = x.shape[0]
 
-            if (u < 0.95):
-              prop = rand.multivariate_normal(keys[1], x, emp_var * (2.38**2/d))
-            else:
-              prop = ((rand.normal(keys[1], shape=(d,)) + x) * 100 * d)
-
-            # Compute the log acceptance probability
-            alpha = 0.5 * (x @ (solve(r, q.T @ x))
-                           - (prop @ solve(r, q.T @ prop)))
-            
-            return(self.accept(prop, alpha, keys[2]))
-            
+    return(jl.cond(j <= 2*d,
+                   _,
+                   lambda _: initStep(state, q, r, key),
+                   _,
+                   lambda _: adaptStep(state, q, r, key)))
 ```
 
 
-<a id="orge704d2a"></a>
+<a id="org702fdfc"></a>
 
-# Testing
+## Testing 2 electric boogaloo
 
 ```python
-import matplotlib.pyplot as plt
-import jax.numpy as jnp
-import jax.lax as jl
-import jax.random as rand
-import jax.scipy.stats as stat
-from jax import vmap
-from jax.numpy.linalg import solve, qr
-import jax
-import sys
-sys.path.append('~/MyProjects/AdaptiveMCMC/')
+x0 = (1,jnp.array([0.0,0.0]),jnp.array([0.0,0.0]), jnp.array([[1.0,0.0],[0.0,1.0]]))
 
-from AM_in_JAX import Adaptive_State
-
-x0 = Adaptive_State(1,jnp.array([0,0]),jnp.array([0,0]), jnp.array([[1,0],[0,1]]))
-
-sigma = jnp.array([[2,1],[1,2]])
+sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
 Q, R = qr(sigma)
+
+n = 10000
+thinrate = 10
+burnin = 1000
 
 key = jax.random.PRNGKey(seed=1)
 keys = rand.split(key, n)
 
-n = 1000
-thinrate = 10
-burnin = 1000
-
-# Now i want to do an iterate, but I'm struggling to think of how to do this without for loops!
-
-# I could use the scan operation 
-'''
 def step(carry, _):
-    return(carry.oneStep(Q,R, keys[carry.j]), None)
+    nextstate = oneStep(carry, Q, R, keys[carry[0]])
+    return(nextstate, nextstate)
 
-_, results = jl.scan(step, x0, jnp.zeros(n))
+fin, results = jl.scan(step, x0, jnp.zeros(n))
 
-results[-1].x
-'''
-# But Adaptive_State is not a valid JAX type. I could rewrite to not use a custom class, of course, but I'd rather not do that.
+#there is also jl.fori, which may be able to do the same thing
 
-# Thinning and burnin can be done with [::thinrate] and [burnin:] I think?
+xxt_sum = results[3][n]
+x_sum = results[2][n]
+
+emp_var = xxt_sum/n - jnp.outer(x_sum, x_sum.T)/n**2
+
+print(emp_var)
 ```
