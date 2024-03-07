@@ -27,10 +27,9 @@ object AdaptiveMetropolis:
   type dv = DenseVector[Double]
 
   def plotter(sample: Array[dv], // the sample to plot
-              j: Int, // the coordinate to plot
               file_path: String): Unit = {
 
-    val y = DenseVector(sample.map(x => x(j)))
+    val y = DenseVector(sample.map(x => x(1)))
     val x = DenseVector.tabulate(y.length)(i => (i+1).toDouble)
 
     val f = Figure()
@@ -38,15 +37,15 @@ object AdaptiveMetropolis:
 
     p += plot(x,y)
     p.xlabel = "Index"
-    p.ylabel = "x_j"
+    p.ylabel = "x_1"
 
-    p.title = "Trace Plot of x_j"
+    p.title = "Trace Plot of x_1"
 
     f.saveas(file_path)
 
   }
   
-  def one_AMRTH_step(state: AM_state, q: dm, r: dm, prog: Boolean): AM_state = {
+  def AM_step(state: AM_state, q: dm, r: dm, prog: Boolean): AM_state = {
 
     val j = state.j
     val x_sum = state.x_sum
@@ -110,19 +109,25 @@ object AdaptiveMetropolis:
 
   }
 
-  def AMRTH(state0: AM_state, sigma: dm, prog: Boolean): LazyList[AM_state] = {
+  def AM_iterator(state0: AM_state, sigma: dm, prog: Boolean): LazyList[AM_state] = {
 
     val qr.QR(q,r) = qr(sigma)
 
-    LazyList.iterate(state0)((state: AM_state) => one_AMRTH_step(state, q, r, prog))
+    LazyList.iterate(state0)((state: AM_state) => AM_step(state, q, r, prog))
   }
 
   @main def run(): Unit =
 
-    // dimension of the state space
-    val d = 100
+    val startTime = System.nanoTime()
 
-    // create a chaotic variance to target
+    val d = 10               // dimension of the state space
+    val n: Int = 100000      // size of the desired sample
+    val thinrate: Int = 10   // the thinning rate
+    val burnin: Int = 100000 // the number of iterations for burn-in
+    
+    // the actual number of iterations computed is n*thin + burnin
+
+    // create a chaotic variance matrix to target
     val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
     val M = DenseMatrix(data: _*)
     val sigma = M.t * M
@@ -133,34 +138,34 @@ object AdaptiveMetropolis:
                           DenseMatrix.eye[Double](d),
                           DenseVector.zeros[Double](d))
 
-    val n: Int = 10000 // size of the desired sample
-    val burnin: Int = 1000000
-    val thinrate: Int = 100
-    // The actual number of iterations computed is n*thin + burnin
-
-    val amrth_sample = AMRTH(state0, sigma, true).drop(burnin).thin(thinrate).map(_.x).take(n).toArray
+    
+    // the sample
+    val am_sample = AM_iterator(state0, sigma, false).drop(burnin).thin(thinrate).map(_.x).take(n).toArray
 
     // Empirical Variance matrix of the sample
-    val sigma_j = cov(DenseMatrix(amrth_sample: _*))
+    val sigma_j = cov(DenseMatrix(am_sample: _*))
 
-    val sigma_jdecomp = eig(sigma_j)
+    val sigma_j_decomp = eig(sigma_j)
     val sigma_decomp = eig(sigma)
 
-    val rootsigmaj = sigma_jdecomp.eigenvectors * diag(sqrt(sigma_jdecomp.eigenvalues)) * inv(sigma_jdecomp.eigenvectors)
+    val rootsigmaj = sigma_j_decomp.eigenvectors * diag(sqrt(sigma_j_decomp.eigenvalues)) * inv(sigma_j_decomp.eigenvectors)
     val rootsigmainv  = inv(sigma_decomp.eigenvectors * diag(sqrt(sigma_decomp.eigenvalues)) * inv(sigma_decomp.eigenvectors))
 
     val lambda = eig(rootsigmaj * rootsigmainv).eigenvalues
-
     val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
     val lambdainvsum = sum(lambda.map(x => 1/x))
 
-    // According to Roberts and Rosenthal, this should go to 1 at the stationary distribution
+    // According to Roberts and Rosenthal, this should go to
+    // 1 at the stationary distribution
     val b = d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))
 
-    print("\nThe true variance of x_1 value is\n" + sigma(1,1))
+    // the time of computation is seconds
+    val endTime = System.nanoTime()
+    val duration = (endTime - startTime) / 1e9d
 
-    print("\n\nThe Empirical sigma value is\n" + sigma_j(1,1))
+    print("\nThe true variance of x_1 value is " + sigma(1,1))
+    print("\nThe empirical sigma value is " + sigma_j(1,1))
+    print("\nThe b value is " + b)
+    print("\nThe computation took " + duration + " seconds" )
 
-    print("\n The b value is " + b)
-
-    plotter(amrth_sample, 0, "./exports/adaptive_trace.png")
+    plotter(am_sample, "./Figures/adaptive_trace_scala.png")
