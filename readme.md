@@ -1,19 +1,19 @@
-- [Adaptive Metropolis Algorithm](#org5ccfa8f)
-  - [Measure of effectiveness](#orgae3f518)
-- [Example Target](#org14bf816)
-- [Scala implementation](#org31246db)
-- [JAX implementation](#orgaa60f1c)
-- [Results](#orgc58fa18)
-  - [Scala](#org7367a91)
-  - [JAX](#org9f37142)
-  - [Very high dimensions](#orgbe032b7)
+- [Adaptive Metropolis Algorithm](#orgfec174b)
+  - [Measure of effectiveness](#org5bde257)
+- [Example Target](#org4bbee8d)
+- [Scala implementation](#org608064d)
+- [JAX implementation](#org2f92ff2)
+- [Results](#orgae9e654)
+  - [Scala](#org6948e6f)
+  - [JAX](#org41c3722)
+  - [Very high dimensions](#org2e3e2b5)
 
 This is my attempt at implementing Adaptive Metropolis in Scala, using the breeze library, and python, using JAX.
 
 This is based on the example from the article "Examples of Adaptive MCMC" by Roberts and Rosenthal.
 
 
-<a id="org5ccfa8f"></a>
+<a id="orgfec174b"></a>
 
 # Adaptive Metropolis Algorithm
 
@@ -29,7 +29,7 @@ $$\begin{aligned} \Sigma_j=\frac{{\sum_{i=0}^j} x_ix_i^{\intercal}}{j} - \frac{(
 The logic I'm using is to carry forward $\sum x_ix_i^{\intercal}$ and $\sum x_i$ (as well as the current index, $j$) as part of our 'chain', in order to compute the empirical covariance matrix as we go along (I should possibly do a $\frac{n}{n-1}$ transormation to this matrix too), in order to sample from the proposal when $j>2d$ .
 
 
-<a id="orgae3f518"></a>
+<a id="org5bde257"></a>
 
 ## Measure of effectiveness
 
@@ -42,7 +42,7 @@ where $\lambda_i$ are the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ where $\S
 $b$ should approach 1 as the chain approaches the stationary distribution. Roughly, it measures the difference between the empirical and true variance matrices.
 
 
-<a id="org14bf816"></a>
+<a id="org4bbee8d"></a>
 
 # Example Target
 
@@ -63,7 +63,7 @@ We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma 
 Note that Breeze's `DenseMatrix` and `DenseVector` are actually mutable in Scala, so we need to be careful not to mutate anything.
 
 
-<a id="org31246db"></a>
+<a id="org608064d"></a>
 
 # Scala implementation
 
@@ -76,7 +76,7 @@ My Scala implementation of this is found in `Main.scala` (it needs cleanup thoug
 The `run` function then tests this, using `d=10`, `n=100000`, `burnin=100000` and `thinrate=10`. This function, once it finishes, prints out the true variance of $x_1$, the empirical estimate of it from the sample, the $b$ value, and the time the computation took. A trace plot of $x_1$ is also saved to `Figures/adaptive_trace_scala.png`.
 
 
-<a id="orgaa60f1c"></a>
+<a id="org2f92ff2"></a>
 
 # JAX implementation
 
@@ -85,14 +85,14 @@ As you might imagine, the JAX implentation is very similar, even if it is a bit 
 In the file `AM_in_JAX.org` (or `.md`), there is the source code as well as documentation for all the functions, but it is very similar to the scala version.
 
 
-<a id="orgc58fa18"></a>
+<a id="orgae9e654"></a>
 
 # Results
 
 In both implementations, we run with d=10~, `n=100000`, `burnin=100000` and `thinrate=10`.
 
 
-<a id="org7367a91"></a>
+<a id="org6948e6f"></a>
 
 ## Scala
 
@@ -108,8 +108,10 @@ The Scala output can be found using the command `sbt run` in this project's root
 
 ![img](./Figures/adaptive_trace_scala.png)
 
+(note that I can't get rid of the transparency in Breeze-viz, so you may have to turn off dark mode to see this properly)
 
-<a id="org9f37142"></a>
+
+<a id="org41c3722"></a>
 
 ## JAX
 
@@ -123,12 +125,12 @@ The JAX output can be found by running `python AM_in_JAX.py` in this project's r
 > 
 > The computation took 3.7597200870513916 seconds
 
-Obviously, the numbers are different since the target variance is different, but this ran over twice as fast.
+Obviously, the numbers are different since the target variance is different, but this ran over twice as fast
 
 ![img](./Figures/adaptive_trace_jax.png)
 
 
-<a id="orgbe032b7"></a>
+<a id="org2e3e2b5"></a>
 
 ## Very high dimensions
 
