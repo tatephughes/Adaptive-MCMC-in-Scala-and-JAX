@@ -80,8 +80,11 @@ The Scala output can be found using the command ~sbt run~ in this project's root
 
 #+begin_quote
 The true variance of x_1 is 4.0203388245821
+
 The Empirical sigma value is 4.041380732669074
+
 The b value is 1.0000233300468546
+
 The computation took 9.178699105 seconds
 #+end_quote
 
@@ -94,8 +97,11 @@ The JAX output can be found by running ~python AM_in_JAX.py~ in this project's r
 
 #+begin_quote
 The true variance of x_1 is 9.967914581298828
+
 The empirical sigma value is 9.99879264831543
+
 The b value is 1.0000910758972168
+
 The computation took 3.7597200870513916 seconds
 #+end_quote
 
@@ -112,7 +118,9 @@ For ~d=100~, ~n=10000~, ~burnin = 1000000~, and ~thinrate=100~, I get
 
 #+begin_quote
 The true variance of x_1 is 87.24837703682367
+
 The empirical sigma value is 85.1683515513272
+
 The b value is 1.003561061350601
 #+end_quote
 
