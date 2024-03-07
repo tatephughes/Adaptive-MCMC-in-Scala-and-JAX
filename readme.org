@@ -89,7 +89,7 @@ The computation took 9.178699105 seconds
 #+end_quote
 
 #+ATTR_ORG: :height 100
-[[file:/home/tate/MyProjects/AdaptiveMCMC/Figures/adaptive_trace_scala.png]]
+[[file:./Figures/adaptive_trace_scala.png]]
 
 ** JAX
 
@@ -108,7 +108,7 @@ The computation took 3.7597200870513916 seconds
 Obviously, the numbers are different since the target variance is different, but this ran over twice as fast.
 
 #+ATTR_ORG: :height 100
-[[file:/home/tate/MyProjects/AdaptiveMCMC/Figures/adaptive_trace_jax.png]]
+[[file:./Figures/adaptive_trace_jax.png]]
 
 ** Very high dimensions
 
