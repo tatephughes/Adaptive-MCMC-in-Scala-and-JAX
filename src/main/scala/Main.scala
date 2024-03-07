@@ -3,6 +3,7 @@ import breeze.linalg._
 import breeze.numerics._
 import breeze.stats.distributions._
 import org.apache.commons.math3.random.MersenneTwister
+import java.awt.Color
 
 implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(42L)))
 
@@ -32,15 +33,15 @@ object AdaptiveMetropolis:
     val y = DenseVector(sample.map(x => x(1)))
     val x = DenseVector.tabulate(y.length)(i => (i+1).toDouble)
 
-    val f = Figure()
+    val f = Figure("Trace Plot of the first coordinate")
     val p = f.subplot(0)
 
     p += plot(x,y)
-    p.xlabel = "Index"
-    p.ylabel = "x_1"
+    p.xlabel = "Step"
+    p.ylabel = "First coordinate value"
 
-    p.title = "Trace Plot of x_1"
-
+    p.title = "Trace Plot of the first coordinate"
+    
     f.saveas(file_path)
 
   }
@@ -163,7 +164,7 @@ object AdaptiveMetropolis:
     val endTime = System.nanoTime()
     val duration = (endTime - startTime) / 1e9d
 
-    print("\nThe true variance of x_1 value is " + sigma(1,1))
+    print("\nThe true variance of x_1 is " + sigma(1,1))
     print("\nThe empirical sigma value is " + sigma_j(1,1))
     print("\nThe b value is " + b)
     print("\nThe computation took " + duration + " seconds" )

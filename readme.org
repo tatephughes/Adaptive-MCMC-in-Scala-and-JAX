@@ -91,6 +91,8 @@ The computation took 9.178699105 seconds
 #+ATTR_ORG: :height 100
 [[file:./Figures/adaptive_trace_scala.png]]
 
+(note that I can't get rid of the transparency in Breeze-viz, so you may have to turn off dark mode to see this properly)
+
 ** JAX
 
 The JAX output can be found by running ~python AM_in_JAX.py~ in this project's root;
@@ -105,7 +107,7 @@ The b value is 1.0000910758972168
 The computation took 3.7597200870513916 seconds
 #+end_quote
 
-Obviously, the numbers are different since the target variance is different, but this ran over twice as fast.
+Obviously, the numbers are different since the target variance is different, but this ran over twice as fast
 
 #+ATTR_ORG: :height 100
 [[file:./Figures/adaptive_trace_jax.png]]

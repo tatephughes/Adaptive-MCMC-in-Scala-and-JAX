@@ -290,13 +290,13 @@ import matplotlib.pyplot as plt
 def plotter(sample, file_path):
     
     first = sample[:,0]
-    plt.figure(figsize=(10,6))
+    plt.figure(figsize=(590/96,370/96))
     plt.plot(first)
     plt.title('Trace plot of the first coordinate')
     plt.xlabel('Step')
     plt.ylabel('First coordinate value')
     plt.grid(True)
-    plt.savefig(file_path)
+    plt.savefig(file_path, dpi=96)
 
 #+end_src
 
