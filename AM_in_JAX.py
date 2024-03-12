@@ -146,7 +146,7 @@ def thinned_step(thinrate, state, q, r, key):
     
     return jl.fori_loop(0, thinrate, (lambda i, x: AM_step(x, q, r, keys[i])), state)
 
-def main(d=10, n=10000, thinrate=10, burnin=1000):
+def main(d=10, n=100000, thinrate=10, burnin=10000):
 
     start_time = time.time()
 
@@ -202,4 +202,4 @@ if __name__ == "__main__":
     test_adapt_step()
     test_AM_step()
     test_thinned_step()
-    main(d=100, n=100000, thinrate=100, burnin=10000000)
+    main(d=10, n=100000, thinrate=10, burnin=100000)

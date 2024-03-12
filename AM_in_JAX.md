@@ -1,34 +1,35 @@
-- [Boilerplate](#org4225a84)
-  - [Shabang](#orgecbf3a6)
-  - [Imports](#org8aa5bc3)
-- [`AM_step`](#orgb2eb533)
-  - [`try_accept`](#org830fdfa)
-    - [`test_try_accept`](#org2c7cd43)
-  - [`init_step`](#org6e855bd)
-    - [`test_init_step`](#orgfe0c3d5)
-  - [`adap_step`](#org443af7b)
-    - [`test_adapt_step`](#org77c79e4)
-  - [`AM_step`](#orgd60fbaf)
-    - [`test_AM_step`](#orgdec4dc5)
-    - [Covariance function](#orgfebc6b0)
-- [`effectiveness`](#org8cf22ae)
-- [plotting](#org91f1af5)
-- [`thinned_step`](#org93cee13)
-  - [Testing](#orgde53d33)
-- [High Dimensions](#orga8cca6a)
-- [`main`](#org820b83a)
-- [Scratch](#org489f808)
-  - [Integer overflow](#org6c7e120)
+- [Boilerplate](#org694a3f3)
+  - [Shabang](#org385cbdd)
+  - [Imports](#orgeeb95f9)
+  - [Test Imports](#org9d31baf)
+  - [Enable 64-bit precision](#orgd772119)
+- [`AM_step`](#org385f5af)
+  - [`try_accept`](#org3d90a0c)
+    - [`test_try_accept`](#orgbfc8ee1)
+  - [`init_step`](#org5529d5e)
+    - [`test_init_step`](#orge013a97)
+  - [`adap_step`](#org562b17a)
+    - [`test_adapt_step`](#orga910a2e)
+  - [`AM_step`](#org7413ac2)
+    - [`test_AM_step`](#orge36d76d)
+    - [Covariance function](#org7df32f5)
+- [`effectiveness`](#orge47fb65)
+- [plotting](#orged6f6f1)
+- [`thinned_step`](#orgd169610)
+  - [`test_thinned_step`](#orga133890)
+- [`main`](#org7680ae6)
+- [Scratch](#orga4d5c14)
+  - [Integer overflow](#org911a9f0)
 
 This file <span class="underline">is</span> the source code; everything below gets 'tangled' into `AM_in_JAX.py`.
 
 
-<a id="org4225a84"></a>
+<a id="org694a3f3"></a>
 
 # Boilerplate
 
 
-<a id="orgecbf3a6"></a>
+<a id="org385cbdd"></a>
 
 ## Shabang
 
@@ -37,7 +38,7 @@ This file <span class="underline">is</span> the source code; everything below ge
 ```
 
 
-<a id="org8aa5bc3"></a>
+<a id="orgeeb95f9"></a>
 
 ## Imports
 
@@ -51,10 +52,38 @@ from jax import vmap
 from jax.numpy.linalg import solve, qr, norm, eig, inv, cholesky
 import jax
 import time
+from AM_in_JAX_tests import *
 ```
 
 
-<a id="orgb2eb533"></a>
+<a id="org9d31baf"></a>
+
+## Test Imports
+
+```python
+import matplotlib.pyplot as plt
+import jax.numpy as jnp
+import jax.lax as jl
+import jax.random as rand
+import jax.scipy.stats as stat
+from jax import vmap
+from jax.numpy.linalg import solve, qr, norm, eig, inv, cholesky
+import jax
+import time
+from AM_in_JAX import *
+```
+
+
+<a id="orgd772119"></a>
+
+## Enable 64-bit precision
+
+```python
+jax.config.update('jax_enable_x64', True)
+```
+
+
+<a id="org385f5af"></a>
 
 # `AM_step`
 
@@ -65,7 +94,7 @@ Let's assume that the `state` is a tuple with four elements, instead of it's own
 More specificaly, `state = (j, x, x_sum, xxt_sum)`.
 
 
-<a id="org830fdfa"></a>
+<a id="org3d90a0c"></a>
 
 ## `try_accept`
 
@@ -98,7 +127,7 @@ def try_accept(state, prop, alpha, key):
 ```
 
 
-<a id="org2c7cd43"></a>
+<a id="orgbfc8ee1"></a>
 
 ### `test_try_accept`
 
@@ -163,7 +192,7 @@ def test_try_accept():
 ```
 
 
-<a id="org6e855bd"></a>
+<a id="org5529d5e"></a>
 
 ## `init_step`
 
@@ -191,7 +220,7 @@ def init_step(state,q,r,key):
 ```
 
 
-<a id="orgfe0c3d5"></a>
+<a id="orge013a97"></a>
 
 ### `test_init_step`
 
@@ -225,7 +254,7 @@ def test_init_step():
 ```
 
 
-<a id="org443af7b"></a>
+<a id="org562b17a"></a>
 
 ## `adap_step`
 
@@ -267,7 +296,7 @@ def adapt_step(state, q, r, key):
 ```
 
 
-<a id="org77c79e4"></a>
+<a id="orga910a2e"></a>
 
 ### `test_adapt_step`
 
@@ -288,7 +317,7 @@ def test_adapt_step():
     From a (hypothetical) progressed point, the result should be approximately distributed with a N(0,sigma) distribution.
     '''
     def step(carry, _):
-        nextstate = adapt_step(carry, Q, R, keys[carry[0]])
+        nextstate = adapt_step(carry, Q, R, keys[carry[0]])[0]
         return(nextstate, nextstate)
     
     assert norm(cov(jl.scan(step, state, jnp.zeros(n))[1][1]) - sigma) < 0.2, "adap_stepr not producing sample sufficiently close to the target distribution"
@@ -298,7 +327,7 @@ def test_adapt_step():
 ```
 
 
-<a id="orgd60fbaf"></a>
+<a id="org7413ac2"></a>
 
 ## `AM_step`
 
@@ -321,7 +350,7 @@ def AM_step(state, q, r, key):
 ```
 
 
-<a id="orgdec4dc5"></a>
+<a id="orge36d76d"></a>
 
 ### `test_AM_step`
 
@@ -350,7 +379,7 @@ def test_AM_step():
 ```
 
 
-<a id="orgfebc6b0"></a>
+<a id="org7df32f5"></a>
 
 ### Covariance function
 
@@ -371,7 +400,7 @@ def cov(sample):
 ```
 
 
-<a id="org8cf22ae"></a>
+<a id="orge47fb65"></a>
 
 # `effectiveness`
 
@@ -396,15 +425,13 @@ def effectiveness(sigma, sigma_j):
 ```
 
 
-<a id="org91f1af5"></a>
+<a id="orged6f6f1"></a>
 
 # plotting
 
 Exactly as in the Scala version, simply plots the trace of the first coordinate of the given sample, and saves it to a file.
 
 ```python
-import matplotlib.pyplot as plt
-
 def plotter(sample, file_path, d):
     
     first = sample[:,0]
@@ -419,7 +446,7 @@ def plotter(sample, file_path, d):
 ```
 
 
-<a id="org93cee13"></a>
+<a id="orgd169610"></a>
 
 # `thinned_step`
 
@@ -434,9 +461,9 @@ def thinned_step(thinrate, state, q, r, key):
 ```
 
 
-<a id="orgde53d33"></a>
+<a id="orga133890"></a>
 
-## Testing
+## `test_thinned_step`
 
 ```python
 def test_thinned_step():
@@ -462,14 +489,14 @@ def test_thinned_step():
 ```
 
 
-<a id="orga8cca6a"></a>
+<a id="org7680ae6"></a>
 
-# High Dimensions
+# `main`
 
 Due to memory constraints and garbage collection not being wuite as magical, we do burn-in seperately to the main sampling.
 
 ```python
-def highd(d=10, n=10000, thinrate=10, burnin=1000):
+def main(d=10, n=100000, thinrate=10, burnin=10000):
 
     start_time = time.time()
 
@@ -521,94 +548,27 @@ def highd(d=10, n=10000, thinrate=10, burnin=1000):
 
 ```
 
-
-<a id="org820b83a"></a>
-
-# `main`
-
 The entry point for if the code is run in a console.
 
 ```python
-def main():
-    
-    start_time = time.time()
-
-    d = 10          # dimension of the state space
-    n = 100000      # size of the desired sample
-    thinrate = 10   # the thining rate
-    burnin = 100000 # the number of iterations for burn-in
-
-    # the actual number of iterations is n*thin + burnin
-    computed_size = n*thinrate + burnin
-
-    # keys for PRNG
-    key = jax.random.PRNGKey(seed=2)
-    keys = rand.split(key, computed_size+1)
-    
-    # create a chaotic variance matrix to target
-    M = rand.normal(keys[0], shape = (d,d))
-    sigma = M.T @ M
-    Q, R = qr(sigma) # take the QR decomposition of sigma
-
-    # initial state
-    state0 = (1, jnp.zeros(d), jnp.zeros(d), jnp.identity(d), False)
-
-    # JAX's ~scan~ isn't quite ~iterate~, so this is a 'dummy'
-    # function with an unused argument to call AM_step
-    def step(carry, _):
-        nextstate = AM_step(carry, Q, R, keys[carry[0]])
-        return(nextstate, nextstate)
-    
-    # the sample
-    am_sample = jl.scan(step, state0, jnp.zeros(computed_size))[1][1][burnin:][::thinrate]
-
-    # the empirical covariance of the sample
-    sigma_j = cov(am_sample) 
-    
-    sigma_j_decomp = eig(sigma_j)
-    sigma_decomp = eig(sigma)
-    
-    rootsigmaj = sigma_j_decomp[1] @ jnp.diag(jnp.sqrt(sigma_j_decomp[0])) @ inv(sigma_j_decomp[1])
-    rootsigmainv = inv(sigma_decomp[1] @ jnp.diag(jnp.sqrt(sigma_decomp[0])) @ inv(sigma_decomp[1]))
-    
-    lam = eig(rootsigmaj @ rootsigmainv)[0]
-    lambdaminus2sum = sum(1/(lam*lam))
-    lambdainvsum = sum(1/lam)
-
-    # According to Roberts and Rosenthal, this should go to
-    # 1 at the stationary distribution
-    b = (d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))).real
-
-    # the tiume of the computation in seconds
-    end_time = time.time()
-    duration = time.time()-start_time
-    
-    print(f"The true variance of x_1 is {sigma[0,0]}")
-    print(f"The empirical sigma value is {sigma_j[0,0]}")
-    print(f"The b value is {b}")
-    print(f"The computation took {duration} seconds")
-
-    plotter(am_sample, "Figures/adaptive_trace_jax.png", d)
-    plt.show()
-
 if __name__ == "__main__":
     test_try_accept()
     test_init_step()
     test_adapt_step()
     test_AM_step()
-    #main()
-    highd(100,10000,100,1000000) # disable, unless you want the program to run for ages
+    test_thinned_step()
+    main(d=10, n=100000, thinrate=10, burnin=100000)
 ```
 
 
-<a id="org489f808"></a>
+<a id="orga4d5c14"></a>
 
 # Scratch
 
 Here is some in-line python code that doesn't get tangled so i can get things to work properly
 
 
-<a id="org6c7e120"></a>
+<a id="org911a9f0"></a>
 
 ## Integer overflow
 
@@ -646,8 +606,86 @@ indeed, in this case it actually accepted, which seems rare looking at actual ru
 print(results[0])
 ```
 
-we see that it does accept in this case
-
 ```python
 staten = (2000000, jnp.zeros(2), jnp.ones(2), jnp.array([[1e8, 0],[0,1e8]]), False)
+results = jl.scan(step, staten, jnp.zeros(1))
+```
+
+I can confirm that it isn't just an integer overflow by doing a low d sample which should be big enough to overflow
+
+```python
+large_sample = main(d=2, n=10000, thinrate=100, burnin=1000000)
+```
+
+i can try even bigger maybe?
+
+```python
+larger_sample = main(d=2, n=10000, thinrate=100, burnin=10000000)
+```
+
+*even then* it is completely fine!
+
+A smaller high-dimensional sample works too
+
+```python
+small_highd_sample = main(d=100, n=1000, thinrate=10, burnin=10000)
+```
+
+ah we seem to have the issue? I'm going to run the same in scala to see if this is simply not long enouhg of a run.
+
+The scala output is
+
+> The true variance of x<sub>1</sub> is 87.24837703682367 The empirical sigma value is 2.970108488027967 The b value is 2.4138595339835565 The computation took 17.722254715 seconds
+
+so, since I know scala manages at higher samples, this simply is not a big enough sample. So, lets try slowly increasing it until it seems to break;
+
+```python
+highd_sample_2 = main(d=100, n=10000, thinrate=10, burnin=100000)
+```
+
+Given the empirical sigma is much worse than the *smaller* sample, I conclude that something has gone wrong here. For a sanity check, the same is done in scala:
+
+> The true variance of x<sub>1</sub> is 87.24837703682367 The empirical sigma value is 26.630872603471182 The b value is 4.699887552562485 The computation took 182.073910841 seconds
+
+While it is clear that more samples are needed for this kind of dimension, at least the variance is bigger than 1!
+
+We can take a closer look at what is happening. In the next step, this is what `adapt_step` computes for the variance;
+
+```python
+j = highd_sample_2[0][-1]
+x_sum = highd_sample_2[2][-1]
+xxt_sum = highd_sample_2[3][-1]
+
+emp_var= (xxt_sum/j - jnp.outer(x_sum, x_sum)/(j**2))
+print(emp_var[0,0])
+```
+
+and we see, indeed, that we have negative variance. As a sanity check,
+
+```python
+print(cholesky(emp_var))
+```
+
+So it very much fails the positive definite test.
+
+Interestingly, contrary to what I found earlier, changing `j` to a float initally seems to fix things;
+
+```python
+jfloat = j.astype(float)
+emp_var_float= (xxt_sum/jfloat - jnp.outer(x_sum, x_sum)/(jfloat**2))
+print(jnp.all(jnp.diag(emp_var_float) > 0)) # check that all the variances are positive
+```
+
+cbut the cholesky check for positive definiteness
+
+```python
+print(cholesky(emp_var_float))
+```
+
+still fails.
+
+Enabling 64 bit precision fixes it!!!!!
+
+```python
+jax.config.update('jax_enable_x64', True)
 ```

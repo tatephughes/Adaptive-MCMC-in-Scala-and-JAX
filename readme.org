@@ -88,6 +88,8 @@ The b value is 1.0000233300468546
 The computation took 9.178699105 seconds
 #+end_quote
 
+- note: it seems to talonger now, baout 12 seconds
+
 #+ATTR_ORG: :height 100
 [[file:./Figures/adaptive_trace_scala.png]]
 
@@ -112,6 +114,19 @@ Obviously, the numbers are different since the target variance is different, but
 #+ATTR_ORG: :height 100
 [[file:./Figures/adaptive_trace_jax.png]]
 
+*** update
+
+For high dimensions, I had to increase the size of the data types to 64 bit; this drastically impacted computing time for JAX
+
+#+begin_quote
+The true variance of x_1 is 6.589626408404064
+The empirical sigma value is 6.551140424596137
+The b value is 1.0000435338955926
+The computation took 7.1804351806640625 seconds
+#+end_quote
+
+now, the benefits over scala are more minor!
+
 ** Very high dimensions
 
 The paper, in it's examples, get results for ~d=100~. In Scala, using thinning and burn-in, the garbage collector does a good job and we can get high enough iteration counts the the program does very well.
@@ -126,7 +141,7 @@ The computation took 14962.10357885 seconds
 #+end_quote
 
 #+ATTR_ORG: :height 100
-[[file:/home/tate/MyProjects/AdaptiveMCMC/Figures/adaptive_trace_scala_high_d.png]]
+[[file:./Figures/adaptive_trace_scala_high_d.png]]
 
 and in JAX we again get roughly twice the speed (oops that was with about 10 times fewer iterations)
 
@@ -138,4 +153,4 @@ The computation took 786.4629402160645 seconds
 #+end_quote
 
 #+ATTR_ORG: :height 100
-[[file:/home/tate/MyProjects/AdaptiveMCMC/Figures/adaptive_trace_jax_high_d.png]]
+[[file:./Figures/adaptive_trace_jax_high_d.png]]

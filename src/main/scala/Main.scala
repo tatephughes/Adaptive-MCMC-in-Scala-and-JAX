@@ -40,7 +40,7 @@ object AdaptiveMetropolis:
     p.xlabel = "Step"
     p.ylabel = "First coordinate value"
 
-    p.title = "Trace Plot of the first coordinate"
+    p.title = "Trace Plot of the first coordinate, d=" + sample(1).length
     
     f.saveas(file_path)
 
@@ -121,20 +121,20 @@ object AdaptiveMetropolis:
 
     val startTime = System.nanoTime()
 
-    //val d = 10               // dimension of the state space
-    //val n: Int = 100000      // size of the desired sample
-    //val thinrate: Int = 10   // the thinning rate
-    //val burnin: Int = 100000 // the number of iterations for burn-in
+    val d = 10               // dimension of the state space
+    val n: Int = 100000      // size of the desired sample
+    val thinrate: Int = 10   // the thinning rate
+    val burnin: Int = 100000 // the number of iterations for burn-in
 
     //val d = 100               // dimension of the state space
     //val n: Int = 100000       // size of the desired sample
     //val thinrate: Int = 100   // the thinning rate
     //val burnin: Int = 10000000 // the number of iterations for burn-in
     
-    val d = 100               // dimension of the state space
-    val n: Int = 10000       // size of the desired sample
-    val thinrate: Int = 10   // the thinning rate
-    val burnin: Int = 100000 // the number of iterations for burn-in
+    //val d = 100               // dimension of the state space
+    //val n: Int = 10000       // size of the desired sample
+    //val thinrate: Int = 10   // the thinning rate
+    //val burnin: Int = 100000 // the number of iterations for burn-in
 
 
     // the actual number of iterations computed is n*thin + burnin
@@ -152,12 +152,7 @@ object AdaptiveMetropolis:
 
     
     // the sample
-    val am_sample = AM_iterator(state0, sigma, true).drop(burnin).thin(thinrate).take(n).toArray
-
-    print("\n")
-    print(am_sample(n-1).xxt_sum)
-    print("\n")
-    print(am_sample(n-1).x_sum)
+    val am_sample = AM_iterator(state0, sigma, false).drop(burnin).thin(thinrate).take(n).toArray
 
     // Empirical Variance matrix of the sample
     val sigma_j = cov(DenseMatrix(am_sample.map(_.x): _*))

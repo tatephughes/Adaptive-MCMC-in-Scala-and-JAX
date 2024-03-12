@@ -430,7 +430,7 @@ def test_thinned_step():
 Due to memory constraints and garbage collection not being wuite as magical, we do burn-in seperately to the main sampling.
 
 #+begin_src python :session example :results none
-def main(d=10, n=10000, thinrate=10, burnin=1000):
+def main(d=10, n=100000, thinrate=10, burnin=10000):
 
     start_time = time.time()
 
@@ -491,7 +491,7 @@ if __name__ == "__main__":
     test_adapt_step()
     test_AM_step()
     test_thinned_step()
-    main(d=100, n=100000, thinrate=100, burnin=10000000)
+    main(d=10, n=100000, thinrate=10, burnin=100000)
 #+end_src
 
 #+RESULTS:

@@ -1,19 +1,20 @@
-- [Adaptive Metropolis Algorithm](#orgfec174b)
-  - [Measure of effectiveness](#org5bde257)
-- [Example Target](#org4bbee8d)
-- [Scala implementation](#org608064d)
-- [JAX implementation](#org2f92ff2)
-- [Results](#orgae9e654)
-  - [Scala](#org6948e6f)
-  - [JAX](#org41c3722)
-  - [Very high dimensions](#org2e3e2b5)
+- [Adaptive Metropolis Algorithm](#org54dc8af)
+  - [Measure of effectiveness](#org06135b7)
+- [Example Target](#orge2a2eef)
+- [Scala implementation](#orgec4786f)
+- [JAX implementation](#orgabccd24)
+- [Results](#org238e913)
+  - [Scala](#org04942d8)
+  - [JAX](#org9317d8f)
+    - [update](#org6637d55)
+  - [Very high dimensions](#orge69ebb9)
 
 This is my attempt at implementing Adaptive Metropolis in Scala, using the breeze library, and python, using JAX.
 
 This is based on the example from the article "Examples of Adaptive MCMC" by Roberts and Rosenthal.
 
 
-<a id="orgfec174b"></a>
+<a id="org54dc8af"></a>
 
 # Adaptive Metropolis Algorithm
 
@@ -29,7 +30,7 @@ $$\begin{aligned} \Sigma_j=\frac{{\sum_{i=0}^j} x_ix_i^{\intercal}}{j} - \frac{(
 The logic I'm using is to carry forward $\sum x_ix_i^{\intercal}$ and $\sum x_i$ (as well as the current index, $j$) as part of our 'chain', in order to compute the empirical covariance matrix as we go along (I should possibly do a $\frac{n}{n-1}$ transormation to this matrix too), in order to sample from the proposal when $j>2d$ .
 
 
-<a id="org5bde257"></a>
+<a id="org06135b7"></a>
 
 ## Measure of effectiveness
 
@@ -42,7 +43,7 @@ where $\lambda_i$ are the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ where $\S
 $b$ should approach 1 as the chain approaches the stationary distribution. Roughly, it measures the difference between the empirical and true variance matrices.
 
 
-<a id="org4bbee8d"></a>
+<a id="orge2a2eef"></a>
 
 # Example Target
 
@@ -63,7 +64,7 @@ We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma 
 Note that Breeze's `DenseMatrix` and `DenseVector` are actually mutable in Scala, so we need to be careful not to mutate anything.
 
 
-<a id="org608064d"></a>
+<a id="orgec4786f"></a>
 
 # Scala implementation
 
@@ -76,7 +77,7 @@ My Scala implementation of this is found in `Main.scala` (it needs cleanup thoug
 The `run` function then tests this, using `d=10`, `n=100000`, `burnin=100000` and `thinrate=10`. This function, once it finishes, prints out the true variance of $x_1$, the empirical estimate of it from the sample, the $b$ value, and the time the computation took. A trace plot of $x_1$ is also saved to `Figures/adaptive_trace_scala.png`.
 
 
-<a id="org2f92ff2"></a>
+<a id="orgabccd24"></a>
 
 # JAX implementation
 
@@ -85,14 +86,14 @@ As you might imagine, the JAX implentation is very similar, even if it is a bit 
 In the file `AM_in_JAX.org` (or `.md`), there is the source code as well as documentation for all the functions, but it is very similar to the scala version.
 
 
-<a id="orgae9e654"></a>
+<a id="org238e913"></a>
 
 # Results
 
 In both implementations, we run with d=10~, `n=100000`, `burnin=100000` and `thinrate=10`.
 
 
-<a id="org6948e6f"></a>
+<a id="org04942d8"></a>
 
 ## Scala
 
@@ -106,12 +107,14 @@ The Scala output can be found using the command `sbt run` in this project's root
 > 
 > The computation took 9.178699105 seconds
 
+-   note: it seems to talonger now, baout 12 seconds
+
 ![img](./Figures/adaptive_trace_scala.png)
 
 (note that I can't get rid of the transparency in Breeze-viz, so you may have to turn off dark mode to see this properly)
 
 
-<a id="org41c3722"></a>
+<a id="org9317d8f"></a>
 
 ## JAX
 
@@ -130,20 +133,31 @@ Obviously, the numbers are different since the target variance is different, but
 ![img](./Figures/adaptive_trace_jax.png)
 
 
-<a id="org2e3e2b5"></a>
+<a id="org6637d55"></a>
+
+### update
+
+For high dimensions, I had to increase the size of the data types to 64 bit; this drastically impacted computing time for JAX
+
+> The true variance of x<sub>1</sub> is 6.589626408404064 The empirical sigma value is 6.551140424596137 The b value is 1.0000435338955926 The computation took 7.1804351806640625 seconds
+
+now, the benefits over scala are more minor!
+
+
+<a id="orge69ebb9"></a>
 
 ## Very high dimensions
 
 The paper, in it's examples, get results for `d=100`. In Scala, using thinning and burn-in, the garbage collector does a good job and we can get high enough iteration counts the the program does very well.
 
-For `d=100`, `n=10000`, `burnin = 1000000`, and `thinrate=100`, I get
+For `d=100`, `n=10000`, `burnin=1000000`, and `thinrate=100`, I get
 
-> The true variance of x<sub>1</sub> is 87.24837703682367
-> 
-> The empirical sigma value is 85.1683515513272
-> 
-> The b value is 1.003561061350601
+> The true variance of x<sub>1</sub> is 87.24837703682367 The empirical sigma value is 86.13431051648674 The b value is 1.0003412161513419 The computation took 14962.10357885 seconds
 
-This was ran before implementing computation time, it took a long while though.
+![img](./Figures/adaptive_trace_scala_high_d.png)
 
-Unfortunately, as of now, the JAX version runs into a memory error with similar numbers (even though it is allocated around 8GB of memory). It seems that the garbage collector doesn't quite do the same magic as Scala's, and some more work will need to be done to get it to work.
+and in JAX we again get roughly twice the speed (oops that was with about 10 times fewer iterations)
+
+> The true variance of x<sub>1</sub> is 109.05463889081547 The empirical sigma value is 111.75204879394798 The b value is 1.0036710382794376 The computation took 786.4629402160645 seconds
+
+![img](./Figures/adaptive_trace_jax_high_d.png)
