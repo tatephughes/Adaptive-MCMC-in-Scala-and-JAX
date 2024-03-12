@@ -153,11 +153,15 @@ and in JAX we again get roughly twice the speed (oops that was with about 10 tim
 
 #+begin_quote
 The true variance of x_1 is 109.05463889081547
+
 The empirical sigma value is 111.75204879394798
+
 The b value is 1.0036710382794376
+
 The computation took 786.4629402160645 seconds
 #+end_quote
 
 #+ATTR_ORG: :height 100
 [[file:./Figures/adaptive_trace_jax_high_d.png]]
+
 (this isn't currently the correct graph, I accidentally wrote over it, I will re-run soon)
