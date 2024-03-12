@@ -133,8 +133,8 @@ object AdaptiveMetropolis:
     
     val d = 100               // dimension of the state space
     val n: Int = 10000       // size of the desired sample
-    val thinrate: Int = 100   // the thinning rate
-    val burnin: Int = 1000000 // the number of iterations for burn-in
+    val thinrate: Int = 10   // the thinning rate
+    val burnin: Int = 100000 // the number of iterations for burn-in
 
 
     // the actual number of iterations computed is n*thin + burnin

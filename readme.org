@@ -116,7 +116,7 @@ Obviously, the numbers are different since the target variance is different, but
 
 The paper, in it's examples, get results for ~d=100~. In Scala, using thinning and burn-in, the garbage collector does a good job and we can get high enough iteration counts the the program does very well.
 
-For ~d=100~, ~n=10000~, ~burnin = 1000000~, and ~thinrate=100~, I get 
+For ~d=100~, ~n=10000~, ~burnin=1000000~, and ~thinrate=100~, I get 
 
 #+begin_quote
 The true variance of x_1 is 87.24837703682367
@@ -125,4 +125,17 @@ The b value is 1.0003412161513419
 The computation took 14962.10357885 seconds
 #+end_quote
 
-Unfortunately, as of now, the JAX version runs into a memory error with similar numbers (even though it is allocated around 8GB of memory). It seems that the garbage collector doesn't quite do the same magic as Scala's, and some more work will need to be done to get it to work.
+#+ATTR_ORG: :height 100
+[[file:/home/tate/MyProjects/AdaptiveMCMC/Figures/adaptive_trace_scala_high_d.png]]
+
+and in JAX we again get roughly twice the speed (oops that was with about 10 times fewer iterations)
+
+#+begin_quote
+The true variance of x_1 is 109.05463889081547
+The empirical sigma value is 111.75204879394798
+The b value is 1.0036710382794376
+The computation took 786.4629402160645 seconds
+#+end_quote
+
+#+ATTR_ORG: :height 100
+[[file:/home/tate/MyProjects/AdaptiveMCMC/Figures/adaptive_trace_jax_high_d.png]]
