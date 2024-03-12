@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import jax.lax as jl
 import jax.random as rand
 import jax.scipy.stats as stat
-from jax import vmap
+from jax import gvmap
 from jax.numpy.linalg import solve, qr, norm, eig, inv, cholesky
 import jax
 import time
@@ -146,7 +146,7 @@ def thinned_step(thinrate, state, q, r, key):
     
     return jl.fori_loop(0, thinrate, (lambda i, x: AM_step(x, q, r, keys[i])), state)
 
-def main(d=10, n=100000, thinrate=10, burnin=10000):
+def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace_JAX.png"):
 
     start_time = time.time()
 
@@ -192,7 +192,7 @@ def main(d=10, n=100000, thinrate=10, burnin=10000):
     print(f"The b value is {b}")
     print(f"The computation took {duration} seconds")
 
-    plotter(am_sample[1], "Figures/adaptive_trace_jax_high_d.png", d)
+    plotter(am_sample[1], file, d)
     
     return am_sample
 
@@ -203,3 +203,5 @@ if __name__ == "__main__":
     test_AM_step()
     test_thinned_step()
     main(d=10, n=100000, thinrate=10, burnin=100000)
+    #or high dimensions
+    #main(d=100, n=10000, thinrate=100, burnin=1000000, "Figures/adaptive_trace_JAX_high_d.png")

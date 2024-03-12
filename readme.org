@@ -120,8 +120,11 @@ For high dimensions, I had to increase the size of the data types to 64 bit; thi
 
 #+begin_quote
 The true variance of x_1 is 6.589626408404064
+
 The empirical sigma value is 6.551140424596137
+
 The b value is 1.0000435338955926
+
 The computation took 7.1804351806640625 seconds
 #+end_quote
 
@@ -135,8 +138,11 @@ For ~d=100~, ~n=10000~, ~burnin=1000000~, and ~thinrate=100~, I get
 
 #+begin_quote
 The true variance of x_1 is 87.24837703682367
+
 The empirical sigma value is 86.13431051648674
+
 The b value is 1.0003412161513419
+
 The computation took 14962.10357885 seconds
 #+end_quote
 
@@ -154,3 +160,4 @@ The computation took 786.4629402160645 seconds
 
 #+ATTR_ORG: :height 100
 [[file:./Figures/adaptive_trace_jax_high_d.png]]
+(this isn't currently the correct graph, I accidentally wrote over it, I will re-run soon)
