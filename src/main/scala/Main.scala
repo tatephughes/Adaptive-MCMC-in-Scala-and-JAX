@@ -121,11 +121,22 @@ object AdaptiveMetropolis:
 
     val startTime = System.nanoTime()
 
-    val d = 10               // dimension of the state space
-    val n: Int = 100000      // size of the desired sample
-    val thinrate: Int = 10   // the thinning rate
-    val burnin: Int = 100000 // the number of iterations for burn-in
+    //val d = 10               // dimension of the state space
+    //val n: Int = 100000      // size of the desired sample
+    //val thinrate: Int = 10   // the thinning rate
+    //val burnin: Int = 100000 // the number of iterations for burn-in
+
+    //val d = 100               // dimension of the state space
+    //val n: Int = 100000       // size of the desired sample
+    //val thinrate: Int = 100   // the thinning rate
+    //val burnin: Int = 10000000 // the number of iterations for burn-in
     
+    val d = 100               // dimension of the state space
+    val n: Int = 10000       // size of the desired sample
+    val thinrate: Int = 100   // the thinning rate
+    val burnin: Int = 1000000 // the number of iterations for burn-in
+
+
     // the actual number of iterations computed is n*thin + burnin
 
     // create a chaotic variance matrix to target
@@ -141,10 +152,15 @@ object AdaptiveMetropolis:
 
     
     // the sample
-    val am_sample = AM_iterator(state0, sigma, false).drop(burnin).thin(thinrate).map(_.x).take(n).toArray
+    val am_sample = AM_iterator(state0, sigma, true).drop(burnin).thin(thinrate).take(n).toArray
+
+    print("\n")
+    print(am_sample(n-1).xxt_sum)
+    print("\n")
+    print(am_sample(n-1).x_sum)
 
     // Empirical Variance matrix of the sample
-    val sigma_j = cov(DenseMatrix(am_sample: _*))
+    val sigma_j = cov(DenseMatrix(am_sample.map(_.x): _*))
 
     val sigma_j_decomp = eig(sigma_j)
     val sigma_decomp = eig(sigma)
@@ -169,4 +185,4 @@ object AdaptiveMetropolis:
     print("\nThe b value is " + b)
     print("\nThe computation took " + duration + " seconds" )
 
-    plotter(am_sample, "./Figures/adaptive_trace_scala.png")
+    plotter(am_sample.map(_.x), "./Figures/adaptive_trace_scala.png")

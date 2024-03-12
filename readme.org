@@ -120,12 +120,9 @@ For ~d=100~, ~n=10000~, ~burnin = 1000000~, and ~thinrate=100~, I get
 
 #+begin_quote
 The true variance of x_1 is 87.24837703682367
-
-The empirical sigma value is 85.1683515513272
-
-The b value is 1.003561061350601
+The empirical sigma value is 86.13431051648674
+The b value is 1.0003412161513419
+The computation took 14962.10357885 seconds
 #+end_quote
-
-This was ran before implementing computation time, it took a long while though.
 
 Unfortunately, as of now, the JAX version runs into a memory error with similar numbers (even though it is allocated around 8GB of memory). It seems that the garbage collector doesn't quite do the same magic as Scala's, and some more work will need to be done to get it to work.

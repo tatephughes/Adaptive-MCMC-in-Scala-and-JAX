@@ -6,7 +6,7 @@ import jax.lax as jl
 import jax.random as rand
 import jax.scipy.stats as stat
 from jax import vmap
-from jax.numpy.linalg import solve, qr, norm, eig, inv
+from jax.numpy.linalg import solve, qr, norm, eig, inv, cholesky
 import jax
 import time
 
@@ -134,9 +134,11 @@ def test_init_step():
     
     assert norm(cov(jl.scan(step, state0, jnp.zeros(n))[1][1]) - sigma) < 0.2, "init_step not producing sample sufficiently close to the target distribution"
 
+    return True
+
 def adapt_step(state, q, r, key):
 
-    j       = state[0]
+    j       = state[0] # this is an int32, not big enough when i square it below!
     x       = state[1]
     x_sum   = state[2]
     xxt_sum = state[3]
@@ -146,7 +148,7 @@ def adapt_step(state, q, r, key):
 
     z = rand.normal(keys[0], shape=(d,))
     
-    emp_var = xxt_sum/j - jnp.outer(x_sum, x_sum.T)/j**2
+    emp_var = (xxt_sum/j - jnp.outer(x_sum, x_sum)/(j**2))
 
     u = rand.uniform(keys[1])
     
@@ -161,9 +163,30 @@ def adapt_step(state, q, r, key):
     alpha = 0.5 * (x.T @ (solve(r, q.T @ x))
                    - (prop.T @ solve(r, q.T @ prop)))
     
-    return(try_accept(state, prop, alpha, keys[2]))
+    return(try_accept(state, prop, alpha, keys[2]), emp_var)
 
 def test_adapt_step():
+
+    d = 2
+    n = 100000
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    # this state was chosen being close to an actual state of the adaptive chain
+    state = (100, jnp.zeros(2), jnp.array([-80.0,-5.0]), jnp.array([[260.0,100.0],[100.0,150.0]]), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+    
+    '''
+    Test 1:
+    From a (hypothetical) progressed point, the result should be approximately distributed with a N(0,sigma) distribution.
+    '''
+    def step(carry, _):
+        nextstate = adapt_step(carry, Q, R, keys[carry[0]])
+        return(nextstate, nextstate)
+    
+    assert norm(cov(jl.scan(step, state, jnp.zeros(n))[1][1]) - sigma) < 0.2, "adap_stepr not producing sample sufficiently close to the target distribution"
+
+    
     return True
 
 def AM_step(state, q, r, key):
@@ -178,9 +201,28 @@ def AM_step(state, q, r, key):
                    state,
                    lambda y: init_step(y, q, r, key),
                    state,
-                   lambda y: adapt_step(y, q, r, key)))
+                   lambda y: adapt_step(y, q, r, key)[0]))
 
 def test_AM_step():
+
+    d = 2
+    n = 100000
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    state0 = (0, jnp.zeros(2), jnp.zeros(2), jnp.identity(2), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+        
+    '''
+    Test 1:
+    Similarily to the init_step test, from state0, the result should be approximately distributed with a N(0,sigma) distribution.
+    '''
+    def step(carry, _):
+        nextstate = AM_step(carry, Q, R, keys[carry[0]])
+        return(nextstate, nextstate)
+    
+    assert norm(cov(jl.scan(step, state0, jnp.zeros(n))[1][1]) - sigma) < 0.2, "init_step not producing sample sufficiently close to the target distribution"
+    
     return True
 
 def cov(sample):
@@ -195,18 +237,112 @@ def cov(sample):
     
     return covariance
 
+def effectiveness(sigma, sigma_j):
+
+    d = sigma.shape[0]
+    
+    sigma_j_decomp = eig(sigma_j)
+    sigma_decomp = eig(sigma)
+    
+    rootsigmaj = sigma_j_decomp[1] @ jnp.diag(jnp.sqrt(sigma_j_decomp[0])) @ inv(sigma_j_decomp[1])
+    rootsigmainv = inv(sigma_decomp[1] @ jnp.diag(jnp.sqrt(sigma_decomp[0])) @ inv(sigma_decomp[1]))
+    
+    lam = eig(rootsigmaj @ rootsigmainv)[0]
+    lambdaminus2sum = sum(1/(lam*lam))
+    lambdainvsum = sum(1/lam)
+
+    b = (d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))).real
+
+    return b
+
 import matplotlib.pyplot as plt
 
-def plotter(sample, file_path):
+def plotter(sample, file_path, d):
     
     first = sample[:,0]
     plt.figure(figsize=(590/96,370/96))
     plt.plot(first)
-    plt.title('Trace plot of the first coordinate')
+    plt.title(f'Trace plot of the first coordinate, d={d}')
     plt.xlabel('Step')
     plt.ylabel('First coordinate value')
     plt.grid(True)
     plt.savefig(file_path, dpi=96)
+
+def thinned_step(thinrate, state, q, r, key):
+
+    keys = rand.split(key,thinrate)
+    
+    return jl.fori_loop(0, thinrate, (lambda i, x: AM_step(x, q, r, keys[i])), state)
+
+def test_thinned_step():
+
+    d = 2
+    n = 1000
+    thinrate = 10
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    # this state was chosen being close to an actual state of the adaptive chain
+    state = (100, jnp.zeros(2), jnp.array([-80.0,-5.0]), jnp.array([[260.0,100.0],[100.0,150.0]]), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+    
+    '''
+    Test 1:
+    the index of a state should increase by thinrate
+    '''
+    assert (thinned_step(thinrate, state, Q, R, keys[0])[0] == 100+thinrate), "thinned_step not correctly incrementing step count"
+
+    return True
+
+def highd(d=10, n=10000, thinrate=10, burnin=1000):
+
+    start_time = time.time()
+
+    # the actual number of iterations is n*thin + burnin
+    computed_size = n*thinrate + burnin
+
+    # keys for PRNG
+    key = jax.random.PRNGKey(seed=2)
+    keys = rand.split(key, computed_size+1)
+    
+    # create a chaotic variance matrix to target
+    M = rand.normal(keys[0], shape = (d,d))
+    sigma = M.T @ M
+    Q, R = qr(sigma) # take the QR decomposition of sigma
+
+    # initial state before burn-in
+    state0 = (1, jnp.zeros(d), jnp.zeros(d), jnp.identity(d), False)
+
+    # JAX's ~scan~ isn't quite ~iterate~, so this is a 'dummy'
+    # function with an unused argument to call thinned_step for the
+    # actually used samples
+    def step(carry, _):
+        nextstate = thinned_step(thinrate, carry, Q, R, keys[carry[0]])
+        return(nextstate, nextstate)
+
+    # inital state, after burnin
+    start_state = jl.fori_loop(1, burnin, lambda i,x: AM_step(x, Q, R, keys[i]), state0)
+    # this will take a while to run, but once it's done there is only 10000 more to compute;
+
+    # the sample
+    am_sample = jl.scan(step, start_state, jnp.zeros(n))[1]
+
+    # the empirical covariance of the sample
+    sigma_j = cov(am_sample[1])
+    b = effectiveness(sigma,sigma_j)
+
+    # the tiume of the computation in seconds
+    end_time = time.time()
+    duration = time.time()-start_time
+    
+    print(f"The true variance of x_1 is {sigma[0,0]}")
+    print(f"The empirical sigma value is {sigma_j[0,0]}")
+    print(f"The b value is {b}")
+    print(f"The computation took {duration} seconds")
+
+    plotter(am_sample[1], "Figures/adaptive_trace_jax_high_d.png", d)
+    
+    return am_sample
 
 def main():
     
@@ -242,7 +378,7 @@ def main():
     am_sample = jl.scan(step, state0, jnp.zeros(computed_size))[1][1][burnin:][::thinrate]
 
     # the empirical covariance of the sample
-    sigma_j = cov(am_sample   ) 
+    sigma_j = cov(am_sample) 
     
     sigma_j_decomp = eig(sigma_j)
     sigma_decomp = eig(sigma)
@@ -267,7 +403,7 @@ def main():
     print(f"The b value is {b}")
     print(f"The computation took {duration} seconds")
 
-    plotter(am_sample, "Figures/adaptive_trace_jax.png")
+    plotter(am_sample, "Figures/adaptive_trace_jax.png", d)
     plt.show()
 
 if __name__ == "__main__":
@@ -275,4 +411,5 @@ if __name__ == "__main__":
     test_init_step()
     test_adapt_step()
     test_AM_step()
-    main()
+    #main()
+    highd(100,10000,100,1000000) # disable, unless you want the program to run for ages
