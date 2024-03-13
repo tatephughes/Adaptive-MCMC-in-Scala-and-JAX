@@ -251,7 +251,7 @@ time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
   scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
   theme_minimal() + 
-  labs(title = "Compute Timeagainst Dimension",
+  labs(title = "Compute Time against Dimension",
        x = "Dimension",
        y = "Compute Time (seconds)") +
   theme(text = element_text(size = 20))
@@ -277,3 +277,5 @@ print(b_graph)
 
 #+RESULTS:
 [[file:Figures/b_plot.png]]
+
+We can see that while both perform equally as well, JAX maintains roughly double the performance of Scala across the board.
