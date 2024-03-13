@@ -4,12 +4,14 @@ import matplotlib.pyplot as plt
 import jax.numpy as jnp
 import jax.lax as jl
 import jax.random as rand
-import jax.scipy.stats as stat
-from jax import gvmap
+#import jax.scipy.stats as stat
+#from jax import vmap
 from jax.numpy.linalg import solve, qr, norm, eig, inv, cholesky
 import jax
 import time
 from AM_in_JAX_tests import *
+import csv
+import numpy as np
 
 jax.config.update('jax_enable_x64', True)
 
@@ -140,6 +142,57 @@ def plotter(sample, file_path, d):
     plt.grid(True)
     plt.savefig(file_path, dpi=96)
 
+def run_with_complexity(sigma_d, key):
+
+    Q, R = qr(sigma_d) # take the QR decomposition of sigma
+
+    # since I'm timing, this is not a pure function, so
+    # it won't work completely through JAX.
+
+    d = sigma_d.shape[0]
+    
+    # these numbers get good results up to d=100
+    n = 10000
+    thinrate = 10
+    burnin = 1000000
+
+    keys = rand.split(key, n + burnin)
+    state0 = (0, jnp.zeros(d), jnp.zeros(d), jnp.identity(d), False)
+    
+    def step(carry, key):
+        nextstate = thinned_step(thinrate, carry, Q, R, key)
+        return(nextstate, nextstate)
+
+    start_time = time.time()
+    
+    # inital state, after burnin
+    start_state = jl.fori_loop(0, burnin, lambda i,x: AM_step(x, Q, R, keys[i]), state0)
+    # the sample
+    am_sample = jl.scan(step, start_state, keys[burnin:])[1]
+
+    sigma_j = cov(am_sample[1])
+    
+    end_time = time.time()
+    duration = time.time()-start_time
+    
+    b = effectiveness(sigma_d,sigma_j)
+
+    return n, thinrate, burnin, duration, float(b) # making it into a normal float for readability
+
+def compute_time_graph(sigma, csv_file):
+    
+    d = sigma.shape[0]
+
+    key = rand.PRNGKey(seed=1)
+    keys = rand.split(key, d)
+    
+    x = range(1, d+1)
+    y = jnp.array([run_with_complexity(sigma[:i,:i], keys[i]) for i in x if print(i) or True])
+
+    with open(csv_file, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(np.array(y))
+
 def thinned_step(thinrate, state, q, r, key):
 
     keys = rand.split(key,thinrate)
@@ -154,30 +207,29 @@ def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace
     computed_size = n*thinrate + burnin
 
     # keys for PRNG
-    key = jax.random.PRNGKey(seed=2)
-    keys = rand.split(key, computed_size+1)
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key, n + burnin)
     
     # create a chaotic variance matrix to target
-    M = rand.normal(keys[0], shape = (d,d))
+    M = rand.normal(key, shape = (d,d))
     sigma = M.T @ M
     Q, R = qr(sigma) # take the QR decomposition of sigma
 
     # initial state before burn-in
-    state0 = (1, jnp.zeros(d), jnp.zeros(d), jnp.identity(d), False)
+    state0 = (0, jnp.zeros(d), jnp.zeros(d), jnp.identity(d), False)
 
     # JAX's ~scan~ isn't quite ~iterate~, so this is a 'dummy'
     # function with an unused argument to call thinned_step for the
     # actually used samples
-    def step(carry, _):
-        nextstate = thinned_step(thinrate, carry, Q, R, keys[carry[0]])
+    def step(carry, key):
+        nextstate = thinned_step(thinrate, carry, Q, R, key)
         return(nextstate, nextstate)
 
     # inital state, after burnin
-    start_state = jl.fori_loop(1, burnin, lambda i,x: AM_step(x, Q, R, keys[i]), state0)
-    # this will take a while to run, but once it's done there is only 10000 more to compute;
+    start_state = jl.fori_loop(0, burnin, lambda i,x: AM_step(x, Q, R, keys[i]), state0)
 
     # the sample
-    am_sample = jl.scan(step, start_state, jnp.zeros(n))[1]
+    am_sample = jl.scan(step, start_state, keys[burnin:])[1]
 
     # the empirical covariance of the sample
     sigma_j = cov(am_sample[1])
@@ -197,11 +249,20 @@ def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace
     return am_sample
 
 if __name__ == "__main__":
-    test_try_accept()
-    test_init_step()
-    test_adapt_step()
-    test_AM_step()
-    test_thinned_step()
-    main(d=10, n=100000, thinrate=10, burnin=100000)
+    #test_try_accept()
+    #test_init_step()
+    #test_adapt_step()
+    #test_AM_step()
+    #test_thinned_step()
+    #main(d=10,n=100000, thinrate=10, burnin=100000)
     #or high dimensions
-    #main(d=100, n=10000, thinrate=100, burnin=1000000, "Figures/adaptive_trace_JAX_high_d.png")
+    #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
+    numpy_matrix = []
+    with open('chaotic_variance.csv', 'r', newline='') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            # Assuming the content is numeric, converts strings to floats.
+            # This step might need adjustment based on the actual content of your CSV.
+            numpy_matrix.append([float(item) for item in row])
+    sigma = jnp.array(numpy_matrix)
+    compute_time_graph(sigma, "data/JAX_compute_times.csv")

@@ -1,20 +1,22 @@
-- [Adaptive Metropolis Algorithm](#org0871761)
-  - [Measure of effectiveness](#orgceb10bf)
-- [Example Target](#orgfa1bb7d)
-- [Scala implementation](#org06880a0)
-- [JAX implementation](#orgad9785c)
-- [Results](#orgd7176fb)
-  - [Scala](#org1258526)
-  - [JAX](#org65a6d93)
-    - [update](#orgce4407e)
-  - [Very high dimensions](#orga25c5c4)
+- [Adaptive Metropolis Algorithm](#org2250080)
+  - [Measure of effectiveness](#orgfc16b9c)
+- [Example Target](#org4b29ac3)
+- [Scala implementation](#orge4a0ec7)
+- [JAX implementation](#orgdfd5f24)
+- [Results](#org0d6bebb)
+  - [Scala](#org86796ec)
+  - [JAX](#org315abf3)
+    - [update](#org8222ddd)
+  - [Very high dimensions](#org1bdfe74)
+- [Complexity vs time](#org7f51789)
+  - [Plotting](#orgbc072c2)
 
 This is my attempt at implementing Adaptive Metropolis in Scala, using the breeze library, and python, using JAX.
 
 This is based on the example from the article "Examples of Adaptive MCMC" by Roberts and Rosenthal.
 
 
-<a id="org0871761"></a>
+<a id="org2250080"></a>
 
 # Adaptive Metropolis Algorithm
 
@@ -30,7 +32,7 @@ $$\begin{aligned} \Sigma_j=\frac{{\sum_{i=0}^j} x_ix_i^{\intercal}}{j} - \frac{(
 The logic I'm using is to carry forward $\sum x_ix_i^{\intercal}$ and $\sum x_i$ (as well as the current index, $j$) as part of our 'chain', in order to compute the empirical covariance matrix as we go along (I should possibly do a $\frac{n}{n-1}$ transormation to this matrix too), in order to sample from the proposal when $j>2d$ .
 
 
-<a id="orgceb10bf"></a>
+<a id="orgfc16b9c"></a>
 
 ## Measure of effectiveness
 
@@ -43,7 +45,7 @@ where $\lambda_i$ are the eigenvalues of $\Sigma_p^{1/2}\Sigma^{-1/2}$ where $\S
 $b$ should approach 1 as the chain approaches the stationary distribution. Roughly, it measures the difference between the empirical and true variance matrices.
 
 
-<a id="orgfa1bb7d"></a>
+<a id="org4b29ac3"></a>
 
 # Example Target
 
@@ -64,7 +66,7 @@ We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma 
 Note that Breeze's `DenseMatrix` and `DenseVector` are actually mutable in Scala, so we need to be careful not to mutate anything.
 
 
-<a id="org06880a0"></a>
+<a id="orge4a0ec7"></a>
 
 # Scala implementation
 
@@ -77,7 +79,7 @@ My Scala implementation of this is found in `Main.scala` (it needs cleanup thoug
 The `run` function then tests this, using `d=10`, `n=100000`, `burnin=100000` and `thinrate=10`. This function, once it finishes, prints out the true variance of $x_1$, the empirical estimate of it from the sample, the $b$ value, and the time the computation took. A trace plot of $x_1$ is also saved to `Figures/adaptive_trace_scala.png`.
 
 
-<a id="orgad9785c"></a>
+<a id="orgdfd5f24"></a>
 
 # JAX implementation
 
@@ -86,14 +88,14 @@ As you might imagine, the JAX implentation is very similar, even if it is a bit 
 In the file `AM_in_JAX.org` (or `.md`), there is the source code as well as documentation for all the functions, but it is very similar to the scala version.
 
 
-<a id="orgd7176fb"></a>
+<a id="org0d6bebb"></a>
 
 # Results
 
-In both implementations, we run with d=10~, `n=100000`, `burnin=100000` and `thinrate=10`.
+In both implementations, we run with `d=10`, `n=100000`, `burnin=100000` and `thinrate=10`.
 
 
-<a id="org1258526"></a>
+<a id="org86796ec"></a>
 
 ## Scala
 
@@ -107,14 +109,14 @@ The Scala output can be found using the command `sbt run` in this project's root
 > 
 > The computation took 9.178699105 seconds
 
--   note: it seems to talonger now, baout 12 seconds
+-   note: it seems to take longer now, about 12 seconds
 
 ![img](./Figures/adaptive_trace_scala.png)
 
 (note that I can't get rid of the transparency in Breeze-viz, so you may have to turn off dark mode to see this properly)
 
 
-<a id="org65a6d93"></a>
+<a id="org315abf3"></a>
 
 ## JAX
 
@@ -133,7 +135,7 @@ Obviously, the numbers are different since the target variance is different, but
 ![img](./Figures/adaptive_trace_jax.png)
 
 
-<a id="orgce4407e"></a>
+<a id="org8222ddd"></a>
 
 ### update
 
@@ -150,7 +152,7 @@ For high dimensions, I had to increase the size of the data types to 64 bit; thi
 now, the benefits over scala are more minor!
 
 
-<a id="orga25c5c4"></a>
+<a id="org1bdfe74"></a>
 
 ## Very high dimensions
 
@@ -181,3 +183,97 @@ and in JAX we again get roughly twice the speed (oops that was with about 10 tim
 ![img](./Figures/adaptive_trace_jax_high_d.png)
 
 (this isn't currently the correct graph, I accidentally wrote over it, I will re-run soon)
+
+
+<a id="org7f51789"></a>
+
+# Complexity vs time
+
+In order to get a better idea of how these implementations compare, we use the same chaotic variance matrix for both, with increasing submatrices, so we can make a graph of problem dimension, `d`, against time.
+
+Firstly, here is a little python code to write out the matrix to a csv file, so both programs can read it, so we control the target variance;
+
+```python
+import jax
+import jax.numpy as jnp
+import jax.random as rand
+import csv
+import numpy as np
+
+# keys for PRNG
+key = rand.PRNGKey(seed=1)
+
+d = 100
+
+# create a chaotic variance matrix to target
+M = rand.normal(key, shape = (d,d))
+sigma = M.T @ M
+
+with open('data/chaotic_variance.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerows(np.array(sigma))
+
+'data/chaotic_variance.csv'
+```
+
+
+<a id="orgbc072c2"></a>
+
+## Plotting
+
+From here, both versions have a function `compute_time_graph` which outputs a csv file containing the time it took to compute over a million iterations for each submatrix of the intputted variance matrix, whcih will be provided from this file. This is then plotted as below using R.
+
+```R
+library(ascii)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+```
+
+```R
+jax_times <- cbind(1:100,read.csv("./data/JAX_compute_times.csv", header = FALSE)) %>%
+  mutate(proc = "JAX")
+names(jax_times) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+print(ascii(head(jax_times,3)), type="org")
+```
+
+```R
+scala_times <- cbind(1:100,read.csv("./data/scala_compute_times.csv", header = FALSE)) %>%
+  mutate(proc = "Scala")
+names(scala_times) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+print(ascii(head(scala_times,3)), type="org")
+```
+
+We can now use `ggplot` to make a nice plot of this data.
+
+Putting the data together and plotting
+
+```R
+data <- rbind(jax_times, scala_times)
+print(ascii(head(data)), type = "org")
+
+time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
+  geom_line(size = 2) +
+  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
+  theme_minimal() + 
+  labs(title = "Compute Timeagainst Dimension",
+       x = "Dimension",
+       y = "Compute Time (seconds)") +
+  theme(text = element_text(size = 20))
+print(time_graph)
+```
+
+We can also plot the effectiveness value, $b$;
+
+```R
+b_graph <- ggplot(data, aes(x = d, y = b, color = proc)) +
+  geom_line(size = 2) +
+  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
+  theme_minimal() + 
+  labs(title = "Effectiveness against Dimension",
+       x = "Dimension",
+       y = "b") +
+  theme(text = element_text(size = 20))
+print(b_graph)
+```

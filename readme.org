@@ -72,7 +72,7 @@ In the file ~AM_in_JAX.org~ (or ~.md~), there is the source code as well as docu
 
 * Results
 
-In both implementations, we run with d=10~, ~n=100000~, ~burnin=100000~ and ~thinrate=10~.
+In both implementations, we run with ~d=10~, ~n=100000~, ~burnin=100000~ and ~thinrate=10~.
 
 ** Scala
 
@@ -88,7 +88,7 @@ The b value is 1.0000233300468546
 The computation took 9.178699105 seconds
 #+end_quote
 
-- note: it seems to talonger now, baout 12 seconds
+- note: it seems to take longer now, about 12 seconds
 
 #+ATTR_ORG: :height 100
 [[file:./Figures/adaptive_trace_scala.png]]
@@ -165,3 +165,115 @@ The computation took 786.4629402160645 seconds
 [[file:./Figures/adaptive_trace_jax_high_d.png]]
 
 (this isn't currently the correct graph, I accidentally wrote over it, I will re-run soon)
+
+
+* Complexity vs time
+
+In order to get a better idea of how these implementations compare, we use the same chaotic variance matrix for both, with increasing submatrices, so we can make a graph of problem dimension, ~d~, against time.
+
+Firstly, here is a little python code to write out the matrix to a csv file, so both programs can read it, so we control the target variance;
+
+#+begin_src python :session example :results file
+import jax
+import jax.numpy as jnp
+import jax.random as rand
+import csv
+import numpy as np
+
+# keys for PRNG
+key = rand.PRNGKey(seed=1)
+
+d = 100
+
+# create a chaotic variance matrix to target
+M = rand.normal(key, shape = (d,d))
+sigma = M.T @ M
+
+with open('data/chaotic_variance.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerows(np.array(sigma))
+
+'data/chaotic_variance.csv'
+#+end_src
+
+#+RESULTS:
+[[file:data/chaotic_variance.csv]]
+
+** Plotting
+
+From here, both versions have a function ~compute_time_graph~ which outputs a csv file containing the time it took to compute over a million iterations for each submatrix of the intputted variance matrix, whcih will be provided from this file. This is then plotted as below using R.
+
+#+begin_src R :session example :results none
+library(ascii)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+#+end_src
+
+#+begin_src R :session example :results output
+jax_times <- cbind(1:100,read.csv("./data/JAX_compute_times.csv", header = FALSE)) %>%
+  mutate(proc = "JAX")
+names(jax_times) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+print(ascii(head(jax_times,3)), type="org")
+#+end_src
+
+#+RESULTS:
+: |   | d    | n        | thinrate | burnin     | time | b    | proc |
+: |---+------+----------+----------+------------+------+------+------|
+: | 1 | 1.00 | 10000.00 | 10.00    | 1000000.00 | 1.26 | 1.00 | JAX  |
+: | 2 | 2.00 | 10000.00 | 10.00    | 1000000.00 | 1.66 | 1.00 | JAX  |
+: | 3 | 3.00 | 10000.00 | 10.00    | 1000000.00 | 2.20 | 1.00 | JAX  |
+
+#+begin_src R :session example :results output
+scala_times <- cbind(1:100,read.csv("./data/scala_compute_times.csv", header = FALSE)) %>%
+  mutate(proc = "Scala")
+names(scala_times) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+print(ascii(head(scala_times,3)), type="org")
+#+end_src
+
+#+RESULTS:
+: |   | d    | n        | thinrate | burnin     | time | b    | proc  |
+: |---+------+----------+----------+------------+------+------+-------|
+: | 1 | 1.00 | 10000.00 | 10.00    | 1000000.00 | 3.42 | 1.00 | Scala |
+: | 2 | 2.00 | 10000.00 | 10.00    | 1000000.00 | 3.52 | 1.00 | Scala |
+: | 3 | 3.00 | 10000.00 | 10.00    | 1000000.00 | 3.84 | 1.00 | Scala |
+
+We can now use ~ggplot~ to make a nice plot of this data.
+
+Putting the data together and plotting
+
+#+begin_src R :session example :results graphics file :file Figures/time_graph.png :width 1000
+data <- rbind(jax_times, scala_times)
+print(ascii(head(data)), type = "org")
+
+time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
+  geom_line(size = 2) +
+  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
+  theme_minimal() + 
+  labs(title = "Compute Timeagainst Dimension",
+       x = "Dimension",
+       y = "Compute Time (seconds)") +
+  theme(text = element_text(size = 20))
+print(time_graph)
+#+end_src
+
+#+RESULTS:
+[[file:Figures/time_graph.png]]
+
+We can also plot the effectiveness value, $b$;
+
+#+begin_src R :session example :results graphics file :file Figures/b_plot.png :width 1000
+b_graph <- ggplot(data, aes(x = d, y = b, color = proc)) +
+  geom_line(size = 2) +
+  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
+  theme_minimal() + 
+  labs(title = "Effectiveness against Dimension",
+       x = "Dimension",
+       y = "b") +
+  theme(text = element_text(size = 20))
+print(b_graph)
+#+end_src
+
+#+RESULTS:
+[[file:Figures/b_plot.png]]

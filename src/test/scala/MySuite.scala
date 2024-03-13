@@ -1,6 +1,6 @@
 import org.scalatest._
 import flatspec._
-
+import org.apache.commons.math3.random.MersenneTwister
 import breeze.plot._
 import breeze.linalg._
 import breeze.numerics._
@@ -9,11 +9,9 @@ import breeze.stats.distributions.Rand.FixedSeed.randBasis
 
 import AdaptiveMetropolis._
 
+implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(41L)))
+
 class AMSuite extends AnyFlatSpec{
-
-  import AdaptiveMetropolis._
-
-  val seed: Long = 42L
 
   val d = 25
   val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
@@ -28,7 +26,7 @@ class AMSuite extends AnyFlatSpec{
   )
 
   "one_AMRTH_step" should "make a small initial step" in {
-    val state1 = one_AMRTH_step(state0, r, q, seed)
+    val state1 = AM_step(state0, r, q, false)
     assert(norm(state1.x - state0.x) < 100*d)
   }
 

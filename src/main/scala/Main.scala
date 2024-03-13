@@ -4,8 +4,11 @@ import breeze.numerics._
 import breeze.stats.distributions._
 import org.apache.commons.math3.random.MersenneTwister
 import java.awt.Color
+import java.io.PrintWriter
+import reflect.Selectable.reflectiveSelectable
+import scala.io.Source
 
-implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(42L)))
+implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(41L)))
 
 
 case class AM_state(j: Double, 
@@ -117,32 +120,123 @@ object AdaptiveMetropolis:
     LazyList.iterate(state0)((state: AM_state) => AM_step(state, q, r, prog))
   }
 
+  def effectiveness(sigma: dm, sigma_j: dm): Double = {
+
+    // PROBABLY DON'T USE, not sure why but this doesn't seem to work
+
+    val d = sigma.cols
+
+    val sigma_j_decomp = eig(sigma_j)
+    val sigma_decomp = eig(sigma)
+
+    val rootsigmaj = sigma_j_decomp.eigenvectors * diag(sqrt(sigma_j_decomp.eigenvalues)) * inv(sigma_j_decomp.eigenvectors)
+    val rootsigmainv  = inv(sigma_j_decomp.eigenvectors * diag(sqrt(sigma_decomp.eigenvalues)) * inv(sigma_decomp.eigenvectors))
+
+    val lambda = eig(rootsigmaj * rootsigmainv).eigenvalues
+    val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
+    val lambdainvsum = sum(lambda.map(x => 1/x))
+
+    // According to Roberts and Rosenthal, this should go to
+    // 1 at the stationary distribution
+    val b = d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))
+
+    return(b)
+
+  }
+
+  def run_with_complexity(sigma_d: dm): (Int, Int, Int, Double, Double) = {
+
+    val d = sigma_d.cols
+
+    val n: Int = 10000      // size of the desired sample
+    val thinrate: Int = 10   // the thinning rate
+    val burnin: Int = 1000000 // the number of iterations for burn-in
+
+    val state0 = AM_state(0.0,
+                          DenseVector.zeros[Double](d),
+                          DenseMatrix.eye[Double](d),
+                          DenseVector.zeros[Double](d))
+
+
+    // Empirical Variance matrix of the sample
+    val sigma_j = cov(DenseMatrix(AM_iterator(state0, sigma_d, false).drop(burnin).thin(thinrate).take(n).toArray.map(_.x): _*))
+
+    // start of the computation
+    val startTime = System.nanoTime()
+
+    // the time of computation is seconds
+    val endTime = System.nanoTime()
+    val duration = (endTime - startTime) / 1e9d
+
+
+    val sigma_j_decomp = eig(sigma_j)
+    val sigma_decomp = eig(sigma_d)
+
+    val rootsigmaj = sigma_j_decomp.eigenvectors * diag(sqrt(sigma_j_decomp.eigenvalues)) * inv(sigma_j_decomp.eigenvectors)
+    val rootsigmainv  = inv(sigma_decomp.eigenvectors * diag(sqrt(sigma_decomp.eigenvalues)) * inv(sigma_decomp.eigenvectors))
+
+    val lambda = eig(rootsigmaj * rootsigmainv).eigenvalues
+    val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
+    val lambdainvsum = sum(lambda.map(x => 1/x))
+
+    // According to Roberts and Rosenthal, this should go to
+    // 1 at the stationary distribution
+    val b = d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))
+
+    return(n,thinrate,burnin, duration, b)
+
+  }
+
+  def compute_time_graph(sigma: dm, csv_file: String): Unit = {
+
+    val d = sigma.cols
+
+    val x = 1 to d
+
+    val y = for (i <- x) yield {print(s"\n$i"); run_with_complexity(sigma(0 to i-1, 0 to i-1))}
+
+    using(new PrintWriter(csv_file)) { writer =>
+      y.foreach { case (a, b, c, d, e) =>
+        writer.println(s"$a,$b,$c,$d,$e")
+      }
+    }
+
+    def using[A <: { def close(): Unit }, B](resource: A)(block: A => B): B = {
+      try {
+        block(resource)
+      } finally {
+        resource.close()
+      }
+    }
+
+  }
+    
   @main def run(): Unit =
+
+    // Read the file lines, skipping empty lines
+    val lines = Source.fromFile("data/chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
+
+    // Assuming the CSV is well-formed and every row has the same number of columns
+    val data = lines.map(_.split(",").map(_.toDouble))
+
+    // Extracting the row and column counts
+    val numRows = data.length
+    val numCols = data.head.length
+
+    // Creating the DenseMatrix
+    val sigma_d = DenseMatrix(data: _*).reshape(numRows, numCols)
+
+    compute_time_graph(sigma_d, "data/scala_compute_times.csv")
+
+  @main def og_run(): Unit = 
 
     val startTime = System.nanoTime()
 
-    val d = 10               // dimension of the state space
-    val n: Int = 100000      // size of the desired sample
-    val thinrate: Int = 10   // the thinning rate
-    val burnin: Int = 100000 // the number of iterations for burn-in
+    val d = 5
 
-    //val d = 100               // dimension of the state space
-    //val n: Int = 100000       // size of the desired sample
-    //val thinrate: Int = 100   // the thinning rate
-    //val burnin: Int = 10000000 // the number of iterations for burn-in
-    
-    //val d = 100               // dimension of the state space
-    //val n: Int = 10000       // size of the desired sample
-    //val thinrate: Int = 10   // the thinning rate
-    //val burnin: Int = 100000 // the number of iterations for burn-in
-
-
-    // the actual number of iterations computed is n*thin + burnin
-
-    // create a chaotic variance matrix to target
-    val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
-    val M = DenseMatrix(data: _*)
-    val sigma = M.t * M
+    val n: Int = 10000        // size of the desired sample
+    val thinrate: Int = 10    // the thinning rate
+    val burnin: Int = 1000000 // the number of iterations for burn-in
 
     // initial state
     val state0 = AM_state(0.0,
@@ -150,6 +244,9 @@ object AdaptiveMetropolis:
                           DenseMatrix.eye[Double](d),
                           DenseVector.zeros[Double](d))
 
+    val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
+    val M = DenseMatrix(data: _*)
+    val sigma = M.t * M
     
     // the sample
     val am_sample = AM_iterator(state0, sigma, false).drop(burnin).thin(thinrate).take(n).toArray
