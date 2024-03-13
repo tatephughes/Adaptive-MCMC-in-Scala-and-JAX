@@ -243,7 +243,7 @@ We can now use ~ggplot~ to make a nice plot of this data.
 
 Putting the data together and plotting
 
-#+begin_src R :session example :results graphics file :file Figures/time_graph.png :width 1000
+#+begin_src R :session example :results graphics file :file Figures/time_graph.png :width 1000 :exports both
 data <- rbind(jax_times, scala_times)
 print(ascii(head(data)), type = "org")
 
@@ -263,7 +263,7 @@ print(time_graph)
 
 We can also plot the effectiveness value, $b$;
 
-#+begin_src R :session example :results graphics file :file Figures/b_plot.png :width 1000
+#+begin_src R :session example :results graphics file :file Figures/b_plot.png :width 1000 :exports both
 b_graph <- ggplot(data, aes(x = d, y = b, color = proc)) +
   geom_line(size = 2) +
   scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
