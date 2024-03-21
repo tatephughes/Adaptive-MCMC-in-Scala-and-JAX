@@ -157,12 +157,11 @@ object AdaptiveMetropolis:
                           DenseMatrix.eye[Double](d),
                           DenseVector.zeros[Double](d))
 
+    // start of the computation
+    val startTime = System.nanoTime()
 
     // Empirical Variance matrix of the sample
     val sigma_j = cov(DenseMatrix(AM_iterator(state0, sigma_d, false).drop(burnin).thin(thinrate).take(n).toArray.map(_.x): _*))
-
-    // start of the computation
-    val startTime = System.nanoTime()
 
     // the time of computation is seconds
     val endTime = System.nanoTime()
@@ -211,7 +210,7 @@ object AdaptiveMetropolis:
 
   }
     
-  @main def run(): Unit =
+  def run(): Unit =
 
     // Read the file lines, skipping empty lines
     val lines = Source.fromFile("data/chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
@@ -232,10 +231,10 @@ object AdaptiveMetropolis:
 
     val startTime = System.nanoTime()
 
-    val d = 5
+    val d = 100
 
     val n: Int = 10000        // size of the desired sample
-    val thinrate: Int = 10    // the thinning rate
+    val thinrate: Int = 100    // the thinning rate
     val burnin: Int = 1000000 // the number of iterations for burn-in
 
     // initial state
@@ -277,4 +276,4 @@ object AdaptiveMetropolis:
     print("\nThe b value is " + b)
     print("\nThe computation took " + duration + " seconds" )
 
-    plotter(am_sample.map(_.x), "./Figures/adaptive_trace_scala.png")
+    plotter(am_sample.map(_.x), "./Figures/adaptive_trace_scala_high_d.png")

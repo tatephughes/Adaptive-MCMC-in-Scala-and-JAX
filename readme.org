@@ -146,7 +146,6 @@ The b value is 1.0003412161513419
 The computation took 14962.10357885 seconds
 #+end_quote
 
-#+ATTR_ORG: :height 100
 [[file:./Figures/adaptive_trace_scala_high_d.png]]
 
 and in JAX we again get roughly twice the speed (oops that was with about 10 times fewer iterations)

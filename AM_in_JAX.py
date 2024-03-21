@@ -39,6 +39,7 @@ def try_accept(state, prop, alpha, key):
           xxt_sum + jnp.outer(new_x, new_x),
           is_accepted))
 
+@jit
 def init_step(state,q,r,key):
 
     j       = state[0]
@@ -46,7 +47,7 @@ def init_step(state,q,r,key):
     x_sum   = state[2]
     xxt_sum = state[3]
     d       = x.shape[0]
-
+    
     keys = rand.split(key,3)
     z = rand.normal(keys[0], shape=(d,))
     
@@ -254,15 +255,15 @@ if __name__ == "__main__":
     #test_adapt_step()
     #test_AM_step()
     #test_thinned_step()
-    #main(d=10,n=100000, thinrate=10, burnin=100000)
+    main(d=10,n=10000, thinrate=10, burnin=10000)
     #or high dimensions
     #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
-    numpy_matrix = []
-    with open('chaotic_variance.csv', 'r', newline='') as file:
-        reader = csv.reader(file)
-        for row in reader:
-            # Assuming the content is numeric, converts strings to floats.
-            # This step might need adjustment based on the actual content of your CSV.
-            numpy_matrix.append([float(item) for item in row])
-    sigma = jnp.array(numpy_matrix)
-    compute_time_graph(sigma, "data/JAX_compute_times.csv")
+    #numpy_matrix = []
+    #with open('chaotic_variance.csv', 'r', newline='') as file:
+    #    reader = csv.reader(file)
+    #    for row in reader:
+    #        # Assuming the content is numeric, converts strings to floats.
+    #        # This step might need adjustment based on the actual content of your CSV.
+    #        numpy_matrix.append([float(item) for item in row])
+    #sigma = jnp.array(numpy_matrix)
+    #compute_time_graph(sigma, "data/JAX_compute_times.csv")
