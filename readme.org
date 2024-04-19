@@ -189,7 +189,7 @@ The computation took 786.4629402160645 seconds
 
 * Benchmarks on a more powerful system
 
-On my personal PC with and RTX 3060ti (notably a gaming card, not particularly suitable for this purpose) I get the following results
+On my personal PC with a Ryzen 7 5800X and an RTX 3060ti (notably a gaming card, not particularly suitable for this purpose) I get the following results
 
 ** Scala
 
