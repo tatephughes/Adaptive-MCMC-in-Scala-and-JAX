@@ -132,7 +132,7 @@ The computation took 3.7597200870513916 seconds
 Obviously, the numbers are different since the target variance is different, but this ran over twice as fast
 
 #+ATTR_ORG: :height 100
-[[file:./Figures/adaptive_trace_jax.png]]
+[[file:./Figures/adaptive_trace_JAX.png]]
 
 *** update
 
