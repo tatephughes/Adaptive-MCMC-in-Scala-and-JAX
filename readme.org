@@ -1,9 +1,29 @@
 #+TITLE: Adaptive Metropolis in Scala and JAX
 
+:BOILERPLATE:
 #+BIBLIOGRAPHY: Bibliography.bib
-#+BIBLIOGRAPHY: Bibliography.bib
-#+LATEX_HEADER: \usepackage{amsmath,amsfonts,amssymb,tikz,tkz-graph}
+#+LATEX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [letterpaper]
+#+OPTIONS: toc:nil
+#+LATEX_HEADER: \usepackage{amsmath,amsfonts,amsthm,amssymb,bm,tikz,tkz-graph}
 #+LATEX_HEADER: \usetikzlibrary{arrows}
+#+LATEX_HEADER: \usetikzlibrary{bayesnet}
+#+LATEX_HEADER: \usetikzlibrary{matrix}
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
+#+LATEX_HEADER: \usepackage[english]{babel}
+#+LATEX_HEADER: \newtheorem{theorem}{Theorem}[section]
+#+LATEX_HEADER: \newtheorem{corollary}[theorem]{Corollary}
+#+LATEX_HEADER: \newtheorem{lemma}[theorem]{Lemma}
+#+LATEX_HEADER: \newtheorem{definition}[theorem]{Definition}
+#+LATEX_HEADER: \newtheorem*{remark}{Remark}
+#+LATEX_HEADER: \DeclareMathOperator{\E}{\mathbb E}}
+#+LATEX_HEADER: \DeclareMathOperator{\var}{\mathbb V\mathrm{ar}}
+#+LATEX_HEADER: \DeclareMathOperator{\cov}{\mathbb C\mathrm{ov}}
+#+LATEX_HEADER: \DeclareMathOperator{\cor}{\mathbb C\mathrm{or}}
+#+LATEX_HEADER: \newcommand*{\mat}[1]{\bm{#1}}
+#+LATEX_HEADER: \renewcommand*{\vec}[1]{\boldsymbol{\mathbf{#1}}}
+#+EXPORT_EXCLUDE_TAGS: noexport
+:END:
 
 This is my attempt at implementing Adaptive Metropolis in Scala, using the breeze library, and python, using JAX.
 
@@ -130,6 +150,7 @@ The computation took 7.1804351806640625 seconds
 
 now, the benefits over scala are more minor!
 
+
 ** Very high dimensions
 
 The paper, in it's examples, get results for ~d=100~. In Scala, using thinning and burn-in, the garbage collector does a good job and we can get high enough iteration counts the the program does very well.
@@ -164,6 +185,42 @@ The computation took 786.4629402160645 seconds
 [[file:./Figures/adaptive_trace_jax_high_d.png]]
 
 (this isn't currently the correct graph, I accidentally wrote over it, I will re-run soon)
+
+
+* Benchmarks on a more powerful system
+
+On my personal PC with and RTX 3060ti (notably a gaming card, not particularly suitable for this purpose) I get the following results
+
+** Scala
+
+#+begin_quote
+The true variance of x_1 is 11.731161806946728
+The empirical sigma value is 11.856237624615899
+The b value is 1.00016514597069
+The computation took 11.173750967 seconds
+#+end_quote
+
+** JAX (CPU)
+
+#+begin_quote
+The true variance of x_1 is 7.858357375214536
+The empirical sigma value is 8.02485487422553
+The b value is 1.0004841316639048
+The computation took 1.9246833324432373 seconds
+#+end_quote
+
+** JAX (GPU)
+
+One of the biggest reasons to use JAX is its NVIDIA GPU support. Running the same $d=10$ test again, 
+
+#+begin_quote
+The true variance of x_1 is 7.858357375214536
+The empirical sigma value is 8.02485487422554
+The b value is 1.0004841316639033
+The computation took 30.754671812057495 seconds
+#+end_quote
+
+so something is very wrong!
 
 
 * Complexity vs time
@@ -278,3 +335,32 @@ print(b_graph)
 [[file:Figures/b_plot.png]]
 
 We can see that while both perform equally as well, JAX maintains roughly double the performance of Scala across the board.
+
+** On the PC
+
+#+begin_src R :session example :results none
+jax_times_pc <- cbind(1:100,read.csv("./data/JAX_compute_times_pc.csv", header = FALSE)) %>%
+  mutate(proc = "JAX")
+names(jax_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+scala_times_pc <- cbind(1:100,read.csv("./data/scala_compute_times_pc.csv", header = FALSE)) %>%
+  mutate(proc = "Scala")
+names(scala_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+#+end_src
+
+#+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_pc.png :width 1000 :exports both
+data <- rbind(jax_times_pc, scala_times_pc)
+print(ascii(head(data)), type = "org")
+
+time_graph_pc <- ggplot(data, aes(x = d, y = time, color = proc)) +
+  geom_line(size = 2) +
+  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
+  theme_minimal() + 
+  labs(title = "Compute Time against Dimension",
+       x = "Dimension",
+       y = "Compute Time (seconds)") +
+  theme(text = element_text(size = 20))
+print(time_graph_pc)
+#+end_src
+
+#+RESULTS:
+[[file:./Figures/plot_complexity_pc.png]]

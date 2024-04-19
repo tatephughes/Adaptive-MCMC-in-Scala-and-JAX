@@ -210,7 +210,7 @@ object AdaptiveMetropolis:
 
   }
     
-  def run(): Unit =
+  @main def run(): Unit =
 
     // Read the file lines, skipping empty lines
     val lines = Source.fromFile("data/chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
@@ -227,11 +227,11 @@ object AdaptiveMetropolis:
 
     compute_time_graph(sigma_d, "data/scala_compute_times.csv")
 
-  @main def og_run(): Unit = 
+  def og_run(): Unit = 
 
     val startTime = System.nanoTime()
 
-    val d = 100
+    val d = 10
 
     val n: Int = 10000        // size of the desired sample
     val thinrate: Int = 100    // the thinning rate
@@ -248,7 +248,7 @@ object AdaptiveMetropolis:
     val sigma = M.t * M
     
     // the sample
-    val am_sample = AM_iterator(state0, sigma, false).drop(burnin).thin(thinrate).take(n).toArray
+    val am_sample = AM_iterator(state0, sigma, true).drop(burnin).thin(thinrate).take(n).toArray
 
     // Empirical Variance matrix of the sample
     val sigma_j = cov(DenseMatrix(am_sample.map(_.x): _*))
