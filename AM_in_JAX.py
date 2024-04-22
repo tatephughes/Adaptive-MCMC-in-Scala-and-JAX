@@ -123,7 +123,7 @@ def effectiveness(sigma, sigma_j):
     rootsigmaj = sigma_j_decomp[1] @ jnp.diag(jnp.sqrt(sigma_j_decomp[0])) @ inv(sigma_j_decomp[1])
     rootsigmainv = inv(sigma_decomp[1] @ jnp.diag(jnp.sqrt(sigma_decomp[0])) @ inv(sigma_decomp[1]))
     
-    lam = eigh(rootsigmaj @ rootsigmainv)[0]
+    lam = eigh(rootsigmaj @ rootsigmainv)[0] # wait that might not be symmetric :/
     lambdaminus2sum = sum(1/(lam*lam))
     lambdainvsum = sum(1/lam)
 

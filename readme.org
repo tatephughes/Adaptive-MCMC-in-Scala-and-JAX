@@ -268,44 +268,44 @@ library(patchwork)
 #+end_src
 
 #+begin_src R :session example :results output
-jax_times <- cbind(1:100,read.csv("./data/JAX_compute_times.csv", header = FALSE)) %>%
-  mutate(proc = "JAX")
-names(jax_times) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-print(ascii(head(jax_times,3)), type="org")
+jax_times_laptop_1 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_1.csv", header = FALSE)) %>%
+  mutate(proc = "JAX1")
+names(jax_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+print(ascii(head(jax_times_laptop_1,3)), type="org")
 #+end_src
 
 #+RESULTS:
 : |   | d    | n        | thinrate | burnin     | time | b    | proc |
 : |---+------+----------+----------+------------+------+------+------|
-: | 1 | 1.00 | 10000.00 | 10.00    | 1000000.00 | 1.26 | 1.00 | JAX  |
-: | 2 | 2.00 | 10000.00 | 10.00    | 1000000.00 | 1.66 | 1.00 | JAX  |
-: | 3 | 3.00 | 10000.00 | 10.00    | 1000000.00 | 2.20 | 1.00 | JAX  |
+: | 1 | 1.00 | 10000.00 | 10.00    | 1000000.00 | 1.26 | 1.00 | JAX1 |
+: | 2 | 2.00 | 10000.00 | 10.00    | 1000000.00 | 1.66 | 1.00 | JAX1 |
+: | 3 | 3.00 | 10000.00 | 10.00    | 1000000.00 | 2.20 | 1.00 | JAX1 |
 
 #+begin_src R :session example :results output
-scala_times <- cbind(1:100,read.csv("./data/scala_compute_times.csv", header = FALSE)) %>%
-  mutate(proc = "Scala")
-names(scala_times) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-print(ascii(head(scala_times,3)), type="org")
+scala_times_laptop_1 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1.csv", header = FALSE)) %>%
+  mutate(proc = "Scala1")
+names(scala_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+print(ascii(head(scala_times_laptop_1,3)), type="org")
 #+end_src
 
 #+RESULTS:
-: |   | d    | n        | thinrate | burnin     | time | b    | proc  |
-: |---+------+----------+----------+------------+------+------+-------|
-: | 1 | 1.00 | 10000.00 | 10.00    | 1000000.00 | 3.42 | 1.00 | Scala |
-: | 2 | 2.00 | 10000.00 | 10.00    | 1000000.00 | 3.52 | 1.00 | Scala |
-: | 3 | 3.00 | 10000.00 | 10.00    | 1000000.00 | 3.84 | 1.00 | Scala |
+: |   | d    | n        | thinrate | burnin     | time | b    | proc   |
+: |---+------+----------+----------+------------+------+------+--------|
+: | 1 | 1.00 | 10000.00 | 10.00    | 1000000.00 | 3.42 | 1.00 | Scala1 |
+: | 2 | 2.00 | 10000.00 | 10.00    | 1000000.00 | 3.52 | 1.00 | Scala1 |
+: | 3 | 3.00 | 10000.00 | 10.00    | 1000000.00 | 3.84 | 1.00 | Scala1 |
 
 We can now use ~ggplot~ to make a nice plot of this data.
 
 Putting the data together and plotting
 
-#+begin_src R :session example :results graphics file :file Figures/time_graph.png :width 1000 :exports both
-data <- rbind(jax_times, scala_times)
+#+begin_src R :session example :results graphics file :file Figures/plot_complexity_laptop_1.png :width 1000 :exports both
+data <- rbind(jax_times_laptop_1, scala_times_laptop_1)
 print(ascii(head(data)), type = "org")
 
 time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
-  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
+  scale_color_manual(values = c("JAX1" = "red", "Scala1" = "blue")) +
   theme_minimal() + 
   labs(title = "Compute Time against Dimension",
        x = "Dimension",
@@ -315,14 +315,14 @@ print(time_graph)
 #+end_src
 
 #+RESULTS:
-[[file:Figures/time_graph.png]]
+[[file:Figures/plot_complexity_laptop_1.png]]
 
 We can also plot the effectiveness value, $b$;
 
-#+begin_src R :session example :results graphics file :file Figures/b_plot.png :width 1000 :exports both
+#+begin_src R :session example :results graphics file :file Figures/plot_b_laptop.png :width 1000 :exports both
 b_graph <- ggplot(data, aes(x = d, y = b, color = proc)) +
   geom_line(size = 2) +
-  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
+  scale_color_manual(values = c("JAX1" = "red", "Scala1" = "blue")) +
   theme_minimal() + 
   labs(title = "Effectiveness against Dimension",
        x = "Dimension",
@@ -332,11 +332,13 @@ print(b_graph)
 #+end_src
 
 #+RESULTS:
-[[file:Figures/b_plot.png]]
+[[file:Figures/plot_b_laptop.png]]
 
 We can see that while both perform equally as well, JAX maintains roughly double the performance of Scala across the board.
 
 ** On the PC
+
+I also ran the complexity on the PC. These are the results
 
 #+begin_src R :session example :results none
 jax_times_pc <- cbind(1:100,read.csv("./data/JAX_compute_times_pc.csv", header = FALSE)) %>%
@@ -364,3 +366,58 @@ print(time_graph_pc)
 
 #+RESULTS:
 [[file:./Figures/plot_complexity_pc.png]]
+
+This graph is much more easily explainable; Scala is smooth and very clearly quadratic (which makes sense), and JAX is mostly quadratic but with a bump around $d\approx60$, which is likely due to maxing out some cache size. From there the line gets a bit wobbly, and I'm not sure how to explain that.
+
+** Repeats
+
+Given the odd shape of the original graph, I re-ran them three more times recently. A few things were different this time;
+  + I have recently re-installed my OS, meaning drivers, background processes etc. may be different
+  + Python is now running in a virtual environment
+  + the ~eig~ functions in the JAX ~effectiveness~ function are changed to ~eigh~ to take advantage of symmetry and to allow compatibility with a GPU
+
+None of these should, hypothetically, affect anything. Nevertheless, this is the graph I get;
+
+#+begin_src R :session example :results none
+jax_times_laptop_2 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_2.csv", header = FALSE)) %>%
+  mutate(proc = "JAX2")
+names(jax_times_laptop_2) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+jax_times_laptop_3 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_3.csv", header = FALSE)) %>%
+  mutate(proc = "JAX3")
+names(jax_times_laptop_3) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+jax_times_laptop_4 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_4.csv", header = FALSE)) %>%
+  mutate(proc = "JAX4")
+names(jax_times_laptop_4) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+scala_times_laptop_2 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_2.csv", header = FALSE)) %>%
+  mutate(proc = "Scala2")
+names(scala_times_laptop_2) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+scala_times_laptop_3 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_3.csv", header = FALSE)) %>%
+  mutate(proc = "Scala3")
+names(scala_times_laptop_3) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+scala_times_laptop_4 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_4.csv", header = FALSE)) %>%
+  mutate(proc = "Scala4")
+names(scala_times_laptop_4) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+#+end_src
+
+#+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_laptop_2.png :width 1000 :exports both
+data <- rbind(jax_times_laptop_2, jax_times_laptop_3, jax_times_laptop_4,
+              scala_times_laptop_2, scala_times_laptop_3, scala_times_laptop_4)
+
+time_graph_laptop_2 <- ggplot(data, aes(x = d, y = time, color = proc)) +
+  geom_line(size = 2) +
+  scale_color_manual(values = c("JAX1" = "coral", "JAX2" = "coral2",
+                                "JAX3" = "coral4", "JAX4" = "coral1",
+                                "Scala1" = "cadetblue", "Scala2" = "cadetblue2",
+                                "Scala3" = "cadetblue3", "Scala4" = "cadetblue4")) +
+  theme_minimal() + 
+  labs(title = "Compute Time against Dimension",
+       x = "Dimension",
+       y = "Compute Time (seconds)") +
+  theme(text = element_text(size = 20))
+print(time_graph_laptop_2)
+#+end_src
+
+#+RESULTS:
+[[file:./Figures/plot_complexity_laptop_2.png]]
+
+The JAX performance is significantly worse after the cache is filled, and consistently so! I have no idea what is causing this, it is the same code that was ran on the PC.
