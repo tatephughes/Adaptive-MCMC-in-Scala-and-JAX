@@ -60,15 +60,15 @@ $b$ should approach 1 as the chain approaches the stationary distribution. Rough
 We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma = M \in \mathbb R^{d\times d}$ is a matrix with random $\mathcal N[0,1]$ entries. In Scala, this can be found as below;
 
 #+begin_src scala
-  import AdaptiveMetropolis._
+import AdaptiveMetropolis._
 
-  // dimension of the state space
-  val d = 10
+// dimension of the state space
+val d = 10
 
-  // create a chaotic variance to target
-  val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
-  val M = DenseMatrix(data: _*)
-  val sigma = M.t * M
+// create a chaotic variance to target
+val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
+val M = DenseMatrix(data: _*)
+val sigma = M.t * M
 #+end_src
 
 Note that Breeze's ~DenseMatrix~ and ~DenseVector~ are actually mutable in Scala, so we need to be careful not to mutate anything.
