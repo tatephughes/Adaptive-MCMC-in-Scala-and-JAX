@@ -150,7 +150,6 @@ The computation took 7.1804351806640625 seconds
 
 now, the benefits over scala are more minor!
 
-
 ** Very high dimensions
 
 The paper, in it's examples, get results for ~d=100~. In Scala, using thinning and burn-in, the garbage collector does a good job and we can get high enough iteration counts the the program does very well.
@@ -186,7 +185,6 @@ The computation took 786.4629402160645 seconds
 
 (this isn't currently the correct graph, I accidentally wrote over it, I will re-run soon)
 
-
 * Benchmarks on a more powerful system
 
 On my personal PC with a Ryzen 7 5800X and an RTX 3060ti (notably a gaming card, not particularly suitable for this purpose) I get the following results
@@ -221,7 +219,6 @@ The computation took 30.754671812057495 seconds
 #+end_quote
 
 so something is very wrong!
-
 
 * Complexity vs time
 
