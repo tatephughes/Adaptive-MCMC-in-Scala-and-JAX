@@ -304,7 +304,7 @@ time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
   scale_color_manual(values = c("JAX1" = "red", "Scala1" = "blue")) +
   theme_minimal() + 
-  labs(title = "Compute Time against Dimension",
+  labs(title = "Compute Time against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
        x = "Dimension",
        y = "Compute Time (seconds)") +
   theme(text = element_text(size = 20))
@@ -321,7 +321,7 @@ b_graph <- ggplot(data, aes(x = d, y = b, color = proc)) +
   geom_line(size = 2) +
   scale_color_manual(values = c("JAX1" = "red", "Scala1" = "blue")) +
   theme_minimal() + 
-  labs(title = "Effectiveness against Dimension",
+  labs(title = "Effectiveness against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
        x = "Dimension",
        y = "b") +
   theme(text = element_text(size = 20))
@@ -346,6 +346,8 @@ scala_times_pc <- cbind(1:100,read.csv("./data/scala_compute_times_pc.csv", head
 names(scala_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
 #+end_src
 
+
+
 #+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_pc.png :width 1000 :exports both
 data <- rbind(jax_times_pc, scala_times_pc)
 print(ascii(head(data)), type = "org")
@@ -354,7 +356,7 @@ time_graph_pc <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
   scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
   theme_minimal() + 
-  labs(title = "Compute Time against Dimension",
+  labs(title = "Compute Time against Dimension (Ryzen 7 5800X)",
        x = "Dimension",
        y = "Compute Time (seconds)") +
   theme(text = element_text(size = 20))
@@ -365,6 +367,8 @@ print(time_graph_pc)
 [[file:./Figures/plot_complexity_pc.png]]
 
 This graph is much more easily explainable; Scala is smooth and very clearly quadratic (which makes sense), and JAX is mostly quadratic but with a bump around $d\approx60$, which is likely due to maxing out some cache size. From there the line gets a bit wobbly, and I'm not sure how to explain that.
+
+**** TODO Add specs to the titles                               :projects:
 
 ** Repeats
 
@@ -407,7 +411,7 @@ time_graph_laptop_2 <- ggplot(data, aes(x = d, y = time, color = proc)) +
                                 "Scala1" = "cadetblue", "Scala2" = "cadetblue2",
                                 "Scala3" = "cadetblue3", "Scala4" = "cadetblue4")) +
   theme_minimal() + 
-  labs(title = "Compute Time against Dimension",
+  labs(title = "Compute Time against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
        x = "Dimension",
        y = "Compute Time (seconds)") +
   theme(text = element_text(size = 20))

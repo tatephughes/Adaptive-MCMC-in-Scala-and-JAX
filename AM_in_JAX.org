@@ -54,7 +54,6 @@ from AM_in_JAX import *
 jax.config.update('jax_enable_x64', True)
 #+end_src
 
-
 * ~AM_step~
 
 AM_step is fragmented into four functions, in contrast to the Scala version.
@@ -348,18 +347,20 @@ def cov(sample):
 
 * ~effectiveness~
 
+** TODO Fix the eigenvalue computation with a change of coordinate
+
 #+begin_src python :session example :results none
 def effectiveness(sigma, sigma_j):
 
     d = sigma.shape[0]
     
-    sigma_j_decomp = eig(sigma_j)
-    sigma_decomp = eig(sigma)
+    sigma_j_decomp = eigh(sigma_j)
+    sigma_decomp = eigh(sigma)
     
     rootsigmaj = sigma_j_decomp[1] @ jnp.diag(jnp.sqrt(sigma_j_decomp[0])) @ inv(sigma_j_decomp[1])
     rootsigmainv = inv(sigma_decomp[1] @ jnp.diag(jnp.sqrt(sigma_decomp[0])) @ inv(sigma_decomp[1]))
     
-    lam = eig(rootsigmaj @ rootsigmainv)[0]
+    lam = eigh(rootsigmaj @ rootsigmainv)[0]
     lambdaminus2sum = sum(1/(lam*lam))
     lambdainvsum = sum(1/lam)
 
@@ -551,7 +552,7 @@ if __name__ == "__main__":
     #test_try_accept()
     #test_init_step()
     #test_adapt_step()
-    #test_AM_step()
+    - #test_AM_hstep()
     #test_thinned_step()
     main(d=10,n=10000, thinrate=10, burnin=10000)
     #or high dimensions

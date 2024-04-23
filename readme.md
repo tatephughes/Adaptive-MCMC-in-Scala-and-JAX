@@ -32,7 +32,7 @@ $b$ should approach 1 as the chain approaches the stationary distribution. Rough
 
 We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma = M \in \mathbb R^{d\times d}$ is a matrix with random $\mathcal N[0,1]$ entries. In Scala, this can be found as below;
 
-```scala
+	```scala
 import AdaptiveMetropolis._
 
 // dimension of the state space
