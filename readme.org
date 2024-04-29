@@ -356,7 +356,7 @@ time_graph_pc <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
   scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
   theme_minimal() + 
-  labs(title = "Compute Time against Dimension (Ryzen 7 5800X)",
+  labs(title = "Compute Time against Dimension (Ryzen 7 5800X, 16Gb RAM, )",
        x = "Dimension",
        y = "Compute Time (seconds)") +
   theme(text = element_text(size = 20))
@@ -368,7 +368,7 @@ print(time_graph_pc)
 
 This graph is much more easily explainable; Scala is smooth and very clearly quadratic (which makes sense), and JAX is mostly quadratic but with a bump around $d\approx60$, which is likely due to maxing out some cache size. From there the line gets a bit wobbly, and I'm not sure how to explain that.
 
-**** TODO Add specs to the titles                               :projects:
+**** DONE Add specs to the titles                               :projects:
 
 ** Repeats
 

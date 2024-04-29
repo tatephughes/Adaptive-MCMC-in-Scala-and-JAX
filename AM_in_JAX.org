@@ -14,23 +14,18 @@ This file _is_ the source code; everything below gets 'tangled' into ~AM_in_JAX.
 #!/usr/bin/env python3
 #+end_src
 
-#+RESULTS:
-
 ** Imports
 
 #+begin_src python :session example :results none
 import matplotlib.pyplot as plt
+import jax
 import jax.numpy as jnp
 import jax.lax as jl
 import jax.random as rand
-#import jax.scipy.stats as stat
-#from jax import vmap
-from jax.numpy.linalg import solve, qr, norm, eig, inv, cholesky
-import jax
+from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky
 import time
 from AM_in_JAX_tests import *
 import csv
-import numpy as np
 #+end_src
 
 ** Test Imports
@@ -50,11 +45,15 @@ from AM_in_JAX import *
 
 ** Enable 64-bit precision
 
+This significantly slows the code on most GPUs.
+
+Without this however, the precision is not enough at higher dimensions.
+
 #+begin_src python :session example :results none
 jax.config.update('jax_enable_x64', True)
 #+end_src
 
-* ~AM_step~
+** ~AM_step~
 
 AM_step is fragmented into four functions, in contrast to the Scala version.
 
@@ -359,8 +358,9 @@ def effectiveness(sigma, sigma_j):
     
     rootsigmaj = sigma_j_decomp[1] @ jnp.diag(jnp.sqrt(sigma_j_decomp[0])) @ inv(sigma_j_decomp[1])
     rootsigmainv = inv(sigma_decomp[1] @ jnp.diag(jnp.sqrt(sigma_decomp[0])) @ inv(sigma_decomp[1]))
-    
-    lam = eigh(rootsigmaj @ rootsigmainv)[0]
+
+    # the below line relies on the ~eig~ function which doesn't work on GPUs
+    lam = eig(rootsigmaj @ rootsigmainv)[0]
     lambdaminus2sum = sum(1/(lam*lam))
     lambdainvsum = sum(1/lam)
 
@@ -437,7 +437,7 @@ def run_with_complexity(sigma_d, key):
 #+begin_src python :session example :results none
 def compute_time_graph(sigma, csv_file):
     
-    d = sigma.shape[0]
+    d = 10 #sigma.shape[0]
 
     key = rand.PRNGKey(seed=1)
     keys = rand.split(key, d)
@@ -447,7 +447,7 @@ def compute_time_graph(sigma, csv_file):
 
     with open(csv_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerows(np.array(y))
+        writer.writerows(y)
 #+end_src
 
 
@@ -491,7 +491,7 @@ def test_thinned_step():
 
 * ~main~
 
-Due to memory constraints and garbage collection not being wuite as magical, we do burn-in seperately to the main sampling.
+Due to memory constraints and garbage collection not being quite as magical, we do burn-in seperately to the main sampling.
 
 #+begin_src python :session example :results none
 def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace_JAX.png"):
@@ -552,19 +552,17 @@ if __name__ == "__main__":
     #test_try_accept()
     #test_init_step()
     #test_adapt_step()
-    - #test_AM_hstep()
+    #test_AM_hstep()
     #test_thinned_step()
     main(d=10,n=10000, thinrate=10, burnin=10000)
     #or high dimensions
     #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
-    #numpy_matrix = []
+    #matrix = []
     #with open('chaotic_variance.csv', 'r', newline='') as file:
     #    reader = csv.reader(file)
     #    for row in reader:
-    #        # Assuming the content is numeric, converts strings to floats.
-    #        # This step might need adjustment based on the actual content of your CSV.
-    #        numpy_matrix.append([float(item) for item in row])
-    #sigma = jnp.array(numpy_matrix)
+    #        matrix.append([float(item) for item in row])
+    #sigma = jnp.array(matrix)
     #compute_time_graph(sigma, "data/JAX_compute_times.csv")
 #+end_src
 

@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 
 import matplotlib.pyplot as plt
+import jax
 import jax.numpy as jnp
 import jax.lax as jl
 import jax.random as rand
-#import jax.scipy.stats as stat
-#from jax import vmap
 from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky
-import jax
 import time
 from AM_in_JAX_tests import *
 import csv
-import numpy as np
 
 jax.config.update('jax_enable_x64', True)
 
@@ -46,7 +43,7 @@ def init_step(state,q,r,key):
     x_sum   = state[2]
     xxt_sum = state[3]
     d       = x.shape[0]
-    
+
     keys = rand.split(key,3)
     z = rand.normal(keys[0], shape=(d,))
     
@@ -122,8 +119,9 @@ def effectiveness(sigma, sigma_j):
     
     rootsigmaj = sigma_j_decomp[1] @ jnp.diag(jnp.sqrt(sigma_j_decomp[0])) @ inv(sigma_j_decomp[1])
     rootsigmainv = inv(sigma_decomp[1] @ jnp.diag(jnp.sqrt(sigma_decomp[0])) @ inv(sigma_decomp[1]))
-    
-    lam = eigh(rootsigmaj @ rootsigmainv)[0] # wait that might not be symmetric :/
+
+    # the below line relies on the ~eig~ function which doesn't work on GPUs
+    lam = eig(rootsigmaj @ rootsigmainv)[0]
     lambdaminus2sum = sum(1/(lam*lam))
     lambdainvsum = sum(1/lam)
 
@@ -181,7 +179,7 @@ def run_with_complexity(sigma_d, key):
 
 def compute_time_graph(sigma, csv_file):
     
-    d = sigma.shape[0]
+    d = 10 #sigma.shape[0]
 
     key = rand.PRNGKey(seed=1)
     keys = rand.split(key, d)
@@ -191,7 +189,7 @@ def compute_time_graph(sigma, csv_file):
 
     with open(csv_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerows(np.array(y))
+        writer.writerows(y)
 
 def thinned_step(thinrate, state, q, r, key):
 
@@ -252,15 +250,15 @@ if __name__ == "__main__":
     #test_try_accept()
     #test_init_step()
     #test_adapt_step()
-    #test_AM_step()
+    #test_AM_hstep()
     #test_thinned_step()
-    #main(d=10,n=10000, thinrate=10, burnin=10000)
+    main(d=10,n=10000, thinrate=10, burnin=10000)
     #or high dimensions
     #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
-    numpy_matrix = []
-    with open('data/chaotic_variance.csv', 'r', newline='') as file:
-        reader = csv.reader(file)
-        for row in reader:
-            numpy_matrix.append([float(item) for item in row])
-    sigma = jnp.array(numpy_matrix)
-    compute_time_graph(sigma, "data/JAX_compute_times.csv")
+    #matrix = []
+    #with open('chaotic_variance.csv', 'r', newline='') as file:
+    #    reader = csv.reader(file)
+    #    for row in reader:
+    #        matrix.append([float(item) for item in row])
+    #sigma = jnp.array(matrix)
+    #compute_time_graph(sigma, "data/JAX_compute_times.csv")
