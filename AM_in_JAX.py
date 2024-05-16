@@ -16,87 +16,49 @@ def try_accept(state, prop, alpha, key):
 
   j       = state[0]
   x       = state[1]
-  x_sum   = state[2]
-  xxt_sum = state[3]
+  x_mean  = state[2]
+  prop_cov   = state[3]
   d       = x.shape[0]
   
   log_prob = jnp.minimum(0.0, alpha)
 
   u = rand.uniform(key)
 
-  #new_x = prop if (jnp.log(u) < log_prob) else x
+  x_new, is_accepted = jl.cond((jnp.log(u) < log_prob),
+                               0, lambda _: (prop, True),
+                               0, lambda _: (x, False))
 
-  new_x, is_accepted = jl.cond((jnp.log(u) < log_prob),
-                  0, lambda _: (prop, True),
-                  0, lambda _: (x, False))
+  x_mean_new = x_mean*(j-1)/j  + x_new/j
+
+  prop_cov_new = jl.cond(j <= 2*d,
+                         j,
+                         lambda t: prop_cov,
+                         j,
+                         lambda t: prop_cov*(t-1)/t + (t*jnp.outer(x_mean,x_mean) - (t+1)*jnp.outer(x_mean_new,x_mean_new) + jnp.outer(x_new,x_new) + 0.01*jnp.identity(d))*5.6644/(t*d))
   
+  # NOTE: seems inefficient to construct a diagonal identity matrix like this, I would imagine there is a better way to do this
   return((j + 1,
-          new_x,
-          x_sum + new_x,
-          xxt_sum + jnp.outer(new_x, new_x),
+          x_new,
+          x_mean_new,
+          prop_cov_new,
           is_accepted))
-
-def init_step(state,q,r,key):
-
-    j       = state[0]
-    x       = state[1]
-    x_sum   = state[2]
-    xxt_sum = state[3]
-    d       = x.shape[0]
-
-    keys = rand.split(key,3)
-    z = rand.normal(keys[0], shape=(d,))
-    
-    # The propasal distribution is N(x,1/d) for this first stage
-    prop = z/d + x
-    
-    # Compute the log acceptance probability
-    alpha = 0.5 * (x @ (solve(r, q.T @ x)) - (prop @ solve(r, q.T @ prop)))
-    
-    return(try_accept(state, prop, alpha, keys[1]))
 
 def adapt_step(state, q, r, key):
 
-    j       = state[0] # this is an int32, not big enough when i square it below!
-    x       = state[1]
-    x_sum   = state[2]
-    xxt_sum = state[3]
-    d       = x.shape[0]
+    j        = state[0] # this is an int32, not big enough when i square it below!
+    x        = state[1]
+    prop_cov = state[3]
+    d        = x.shape[0]
 
-    keys = rand.split(key,3)
+    keys = rand.split(key,2)
+    
+    prop = rand.multivariate_normal(keys[0], x, prop_cov)
 
-    z = rand.normal(keys[0], shape=(d,))
-    
-    emp_var = (xxt_sum/j - jnp.outer(x_sum, x_sum)/(j**2))
-
-    u = rand.uniform(keys[1])
-    
-    prop = jl.cond(u < 0.95,
-                   x,
-                   lambda y: rand.multivariate_normal(keys[2], y,
-                                                 emp_var * (2.38**2/d)),
-                   x,
-                   lambda y:((rand.normal(keys[2], shape=(d,))/(100*d) + y)))
-    
     # Compute the log acceptance probability
     alpha = 0.5 * (x.T @ (solve(r, q.T @ x))
                    - (prop.T @ solve(r, q.T @ prop)))
-    
-    return(try_accept(state, prop, alpha, keys[2]), emp_var)
 
-def AM_step(state, q, r, key):
-
-    j       = state[0]
-    x       = state[1]
-    x_sum   = state[2]
-    xxt_sum = state[3]
-    d       = x.shape[0]
-
-    return(jl.cond(j <= 2*d,
-                   state,
-                   lambda y: init_step(y, q, r, key),
-                   state,
-                   lambda y: adapt_step(y, q, r, key)[0]))
+    return(try_accept(state, prop, alpha, keys[1]))
 
 def cov(sample):
     
@@ -154,8 +116,8 @@ def run_with_complexity(sigma_d, key):
     thinrate = 10
     burnin = 1000000
 
-    keys = rand.split(key, n + burnin)
-    state0 = (0, jnp.zeros(d), jnp.zeros(d), jnp.identity(d), False)
+    keys = rand.split(key, n + burnin + 1)
+    state0 = (1, jnp.zeros(d), jnp.zeros(d), jnp.identity(d)/d, False)
     
     def step(carry, key):
         nextstate = thinned_step(thinrate, carry, Q, R, key)
@@ -164,14 +126,14 @@ def run_with_complexity(sigma_d, key):
     start_time = time.time()
     
     # inital state, after burnin
-    start_state = jl.fori_loop(0, burnin, lambda i,x: AM_step(x, Q, R, keys[i]), state0)
+    start_state = jl.fori_loop(1, burnin+1, lambda i,x: adapt_step(x, Q, R, keys[i]), state0)
     # the sample
-    am_sample = jl.scan(step, start_state, keys[burnin:])[1]
+    am_sample = jl.scan(step, start_state, keys[burnin+1:])[1]
 
-    sigma_j = cov(am_sample[1])
-    
     end_time = time.time()
     duration = time.time()-start_time
+    
+    sigma_j = cov(am_sample[1])
     
     b = effectiveness(sigma_d,sigma_j)
 
@@ -179,7 +141,7 @@ def run_with_complexity(sigma_d, key):
 
 def compute_time_graph(sigma, csv_file):
     
-    d = 10 #sigma.shape[0]
+    d = 5 #sigma.shape[0]
 
     key = rand.PRNGKey(seed=1)
     keys = rand.split(key, d)
@@ -194,48 +156,51 @@ def compute_time_graph(sigma, csv_file):
 def thinned_step(thinrate, state, q, r, key):
 
     keys = rand.split(key,thinrate)
-    
-    return jl.fori_loop(0, thinrate, (lambda i, x: AM_step(x, q, r, keys[i])), state)
+
+    # I think this should scan over the keys!
+    return jl.fori_loop(0, thinrate, (lambda i, x: adapt_step(x, q, r, keys[i])), state)
 
 def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace_JAX.png"):
 
-    start_time = time.time()
-
     # the actual number of iterations is n*thin + burnin
-    computed_size = n*thinrate + burnin
+    # computed_size = n*thinrate + burnin
 
     # keys for PRNG
     key = jax.random.PRNGKey(seed=1)
-    keys = rand.split(key, n + burnin)
+    keys = rand.split(key, n + burnin + 1)
     
     # create a chaotic variance matrix to target
-    M = rand.normal(key, shape = (d,d))
+    M = rand.normal(keys[0], shape = (d,d))
     sigma = M.T @ M
     Q, R = qr(sigma) # take the QR decomposition of sigma
 
     # initial state before burn-in
-    state0 = (0, jnp.zeros(d), jnp.zeros(d), jnp.identity(d), False)
+    state0 = (1, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, False)
 
     # JAX's ~scan~ isn't quite ~iterate~, so this is a 'dummy'
     # function with an unused argument to call thinned_step for the
     # actually used samples
+    # NOTE: this comment may be out of date now that I am scanning over the keys
     def step(carry, key):
         nextstate = thinned_step(thinrate, carry, Q, R, key)
         return(nextstate, nextstate)
 
+    start_time = time.time()
+    
     # inital state, after burnin
-    start_state = jl.fori_loop(0, burnin, lambda i,x: AM_step(x, Q, R, keys[i]), state0)
+    start_state = jl.fori_loop(1, burnin+1, lambda i,x: adapt_step(x, Q, R, keys[i]), state0)
 
     # the sample
-    am_sample = jl.scan(step, start_state, keys[burnin:])[1]
+    am_sample = jl.scan(step, start_state, keys[burnin+1:])[1]
 
+    end_time = time.time()
+    duration = time.time()-start_time
+    
     # the empirical covariance of the sample
     sigma_j = cov(am_sample[1])
     b = effectiveness(sigma,sigma_j)
 
     # the tiume of the computation in seconds
-    end_time = time.time()
-    duration = time.time()-start_time
     
     print(f"The true variance of x_1 is {sigma[0,0]}")
     print(f"The empirical sigma value is {sigma_j[0,0]}")
@@ -252,11 +217,11 @@ if __name__ == "__main__":
     #test_adapt_step()
     #test_AM_hstep()
     #test_thinned_step()
-    main(d=10,n=10000, thinrate=10, burnin=10000)
+    main()
     #or high dimensions
     #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
     #matrix = []
-    #with open('chaotic_variance.csv', 'r', newline='') as file:
+    #with open('./data/chaotic_variance.csv', 'r', newline='') as file:
     #    reader = csv.reader(file)
     #    for row in reader:
     #        matrix.append([float(item) for item in row])

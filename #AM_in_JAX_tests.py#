@@ -1,3 +1,4 @@
+
 import matplotlib.pyplot as plt
 import jax.numpy as jnp
 import jax.lax as jl
@@ -65,6 +66,33 @@ def test_try_accept():
 
     return True
 
+def test_init_step():
+
+    # this doesn't take long, but I feel it still takes too long.
+    # I don't want to get into the habit of writing tests with
+    # this amount of computation.
+    
+    d = 2
+    n = 100000
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    state0 = (0, jnp.zeros(2), jnp.zeros(2), jnp.identity(2), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+        
+    '''
+    Test 1:
+    From state0, the result should be approximately distributed with a N(0,sigma) distribution;
+    it should be a standard Random Walk metropolis
+    '''
+    def step(carry, _):
+        nextstate = init_step(carry, Q, R, keys[carry[0]])
+        return(nextstate, nextstate)
+    
+    assert norm(cov(jl.scan(step, state0, jnp.zeros(n))[1][1]) - sigma) < 0.2, "init_step not producing sample sufficiently close to the target distribution"
+
+    return True
+
 def test_adapt_step():
 
     d = 2
@@ -86,6 +114,28 @@ def test_adapt_step():
     
     assert norm(cov(jl.scan(step, state, jnp.zeros(n))[1][1]) - sigma) < 0.2, "adap_stepr not producing sample sufficiently close to the target distribution"
 
+    
+    return True
+
+def test_AM_step():
+
+    d = 2
+    n = 100000
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    state0 = (0, jnp.zeros(2), jnp.zeros(2), jnp.identity(2), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+        
+    '''
+    Test 1:
+    Similarily to the init_step test, from state0, the result should be approximately distributed with a N(0,sigma) distribution.
+    '''
+    def step(carry, _):
+        nextstate = AM_step(carry, Q, R, keys[carry[0]])
+        return(nextstate, nextstate)
+    
+    assert norm(cov(jl.scan(step, state0, jnp.zeros(n))[1][1]) - sigma) < 0.2, "init_step not producing sample sufficiently close to the target distribution"
     
     return True
 

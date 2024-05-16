@@ -1,0 +1,224 @@
+#+TITLE: Adaptive Metropolis in R
+
+* imports
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+library(MASS)
+#+end_src
+
+* ~try_accept~
+
+#+begin_src R :session example :results nonee :tangle AM_in_R.Rscript
+try_accept <- function(state, prop, alpha){
+
+  j        = state$j
+  x        = state$x
+  x_mean   = state$x_mean
+  prop_cov = state$prop_cov
+  d        = length(x)
+
+  log_prob = min(0.0, alpha)
+
+  u <- runif(1)
+
+  if (log(u) < log_prob){
+    x_new <- prop
+    is_accepted <- TRUE
+  } else {
+    x_new <- x
+    is_accepted <- FALSE
+  }
+
+  x_mean_new <- (x_mean*(j-1) + x_new)/j
+  
+  if (j <= 2*d){
+    prop_cov_new <- prop_cov
+  } else {
+    prop_cov_new <- prop_cov*(j-1)/j + (j*(x_mean%*%t(x_mean)) - (j+1)*(x_mean_new%*%t(x_mean_new)) + (x_new%*%t(x_new)) + 0.01*diag(d))*5.6644/(j*d)
+  }
+    
+  return(list(j = j + 1,
+              x = x_new,
+              x_mean = x_mean_new,
+              prop_cov = prop_cov_new,
+              is_accepted = is_accepted))
+}
+#+end_src
+
+* ~adapt_step~
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+adapt_step <- function(state, q, r){
+
+    j        = state$j
+    x        = state$x
+    x_mean   = state$x_mean
+    prop_cov = state$prop_cov
+    d        = length(x)
+    
+    prop = mvrnorm(1, x, prop_cov)
+
+    # Compute the log acceptance probability
+    alpha = 0.5 * (t(x) %*% (solve(r, t(q) %*% x))
+                   - (t(prop) %*% solve(r, t(q) %*% prop)))
+    
+    return(try_accept(state, prop, alpha))
+}
+#+end_src
+
+* ~thinned_step~
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+thinned_step <- function(thinrate, state, q, r){
+  for (i in 1:thinrate) {
+    state <- adapt_step(state, q, r)
+  }
+  return(state)
+}
+#+end_src
+
+* ~main~
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+main <- function(d=10,n=100000, thinrate=10, burnin=10000){
+  
+  M <- matrix(rnorm(d^2), nrow = d)
+  sigma <- t(M) %*% M
+  qr <- qr(sigma)
+  Q <- qr.Q(qr)
+  R <- qr.R(qr)
+
+  state <- list(j = 1, x = rep(0,d), x_mean = rep(0,d), prop_cov = (0.1)^2*diag(d)/d)
+
+  sample <- vector("list", n)
+
+  start_time <- Sys.time()
+  # burnin
+  for (i in 1:burnin) {
+    state <- adapt_step(state, Q, R)
+  }
+
+  # after burnin
+  for (i in 1:n) {
+    state <- thinned_step(thinrate, state, Q, R)
+    sample[[i]] <- state
+  }
+  
+  end_time <- Sys.time()
+  duration <- difftime(end_time, start_time, units="secs")
+
+  sigma_j <- cov(do.call(rbind,
+                         lapply(sample, function(y){y$x})))
+
+  b = effectiveness(sigma ,sigma_j)
+
+  print(paste("The true variance of x_1 is", sigma[1,1]))
+  print(paste("The empirical sigma value is", sigma_j[1,1]))
+  print(paste("The b value is", b))
+  print(paste("The computation took", as.numeric(duration), "seconds"))
+}
+#+end_src
+
+* ~effectiveness~
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+effectiveness <- function(sigma, sigma_j){
+
+  d = sqrt(length(sigma)) # must be like this because 'dim' doesn't work for the 1D case 
+  
+  sigma_j_decomp = eigen(sigma_j)
+  sigma_decomp = eigen(sigma)
+  
+  rootsigmaj = sigma_j_decomp$vectors %*% diag(sqrt(sigma_j_decomp$values), nrow=d) %*% solve(sigma_j_decomp$vectors)
+  rootsigmainv = sigma_decomp$vectors %*% diag(1/sqrt(sigma_decomp$values), nrow=d) %*% solve(sigma_decomp$vectors)
+
+  lam = eigen(rootsigmaj %*% rootsigmainv)$values
+  lambdaminus2sum = sum(1/(lam^2))
+  lambdainvsum = sum(1/lam)
+
+  b = (d * (lambdaminus2sum / (lambdainvsum*lambdainvsum)))
+
+  return(b)
+}
+#+end_src
+
+* Time Graph
+
+** ~run_with_complexity~
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+run_with_complexity <- function(sigma_d){
+
+  qr <- qr(sigma_d)
+  Q <- qr.Q(qr)
+  R <- qr.R(qr) # take the QR decomposition of sigma
+
+  d = sqrt(length(sigma_d))
+  
+  n = 10000
+  thinrate = 10
+  burnin = 1000000
+
+  state <- list(j = 1, x = rep(0,d), x_mean = rep(0,d), prop_cov = (0.1)^2*diag(d)/d)
+  
+  sample <- vector("list", n)
+
+  start_time = Sys.time()
+  
+  # burnin
+  for (i in 1:burnin) {
+    state <- adapt_step(state, Q, R)
+  }
+
+  # after burnin
+  for (i in 1:n) {
+    state <- thinned_step(thinrate, state, Q, R)
+    sample[[i]] <- state
+  }
+
+  end_time <- Sys.time()
+  duration <- as.numeric(difftime(end_time, start_time, units="secs"))
+  
+  sigma_j <- cov(do.call(rbind,
+                        lapply(sample, function(y){y$x})))
+
+  b = effectiveness(sigma_d ,sigma_j)
+  
+  return(c(n, thinrate, burnin, duration, b))
+}
+#+end_src
+
+** ~compute_time_graph~
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+compute_time_graph <- function(sigma, d){
+  
+  y <- vector("list", d)
+  
+  for (i in 1:d) {
+
+    y[[i]] <-run_with_complexity(sigma[1:i,1:i])
+
+    print(i)
+    
+  }
+
+  write.csv(y, "./data/R_compute_times.csv", row.names = FALSE)
+
+}
+#+end_src
+
+* Test Area
+
+#+begin_src R :session example :results output :tangle AM_in_R.Rscript
+main(d=10,n=100000, thinrate=10, burnin=10000)
+#sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
+
+#compute_time_graph(sigma, 5)
+#+end_src
+
+#+RESULTS:
+: [1] "The true variance of x_1 is 8.22879600628684"
+: [1] "The empirical sigma value is 8.20496592343448"
+: [1] "The b value is 1.00002817996086"
+: [1] "The computation took 66.1090097427368 seconds"
