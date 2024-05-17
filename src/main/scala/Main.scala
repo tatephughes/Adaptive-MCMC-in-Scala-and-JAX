@@ -167,7 +167,7 @@ object AdaptiveMetropolis:
 
   def compute_time_graph(sigma: dm, csv_file: String): Unit = {
 
-    val d = 5// = sigma.cols
+    val d = sigma.cols
 
     val x = 1 to d
 
@@ -189,7 +189,7 @@ object AdaptiveMetropolis:
 
   }
     
-  def run(): Unit =
+  @main def run(): Unit =
 
     // Read the file lines, skipping empty lines
     val lines = Source.fromFile("data/chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
@@ -206,7 +206,7 @@ object AdaptiveMetropolis:
 
     compute_time_graph(sigma_d, "data/scala_compute_times.csv")
 
-  @main def simple_run(): Unit = 
+  def simple_run(): Unit = 
 
     val d: Int = 10
     val n: Int = 100000        // size of the desired sample

@@ -172,7 +172,7 @@ compute_time_graph <- function(sigma, d){
 
 }
 
-main(d=10,n=100000, thinrate=10, burnin=10000)
-#sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
+#main(d=10,n=100000, thinrate=10, burnin=10000)
 
-#compute_time_graph(sigma, 5)
+sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
+compute_time_graph(sigma, 30)

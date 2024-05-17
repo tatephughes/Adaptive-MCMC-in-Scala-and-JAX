@@ -141,7 +141,7 @@ def run_with_complexity(sigma_d, key):
 
 def compute_time_graph(sigma, csv_file):
     
-    d = 5 #sigma.shape[0]
+    d = sigma.shape[0]
 
     key = rand.PRNGKey(seed=1)
     keys = rand.split(key, d)
@@ -217,13 +217,13 @@ if __name__ == "__main__":
     #test_adapt_step()
     #test_AM_hstep()
     #test_thinned_step()
-    main()
+    #main()
     #or high dimensions
     #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
-    #matrix = []
-    #with open('./data/chaotic_variance.csv', 'r', newline='') as file:
-    #    reader = csv.reader(file)
-    #    for row in reader:
-    #        matrix.append([float(item) for item in row])
-    #sigma = jnp.array(matrix)
-    #compute_time_graph(sigma, "data/JAX_compute_times.csv")
+    matrix = []
+    with open('./data/chaotic_variance.csv', 'r', newline='') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            matrix.append([float(item) for item in row])
+    sigma = jnp.array(matrix)
+    compute_time_graph(sigma, "data/JAX_compute_times.csv")

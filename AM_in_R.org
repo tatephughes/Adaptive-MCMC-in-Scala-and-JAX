@@ -211,10 +211,10 @@ compute_time_graph <- function(sigma, d){
 * Test Area
 
 #+begin_src R :session example :results output :tangle AM_in_R.Rscript
-main(d=10,n=100000, thinrate=10, burnin=10000)
-#sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
+#main(d=10,n=100000, thinrate=10, burnin=10000)
 
-#compute_time_graph(sigma, 5)
+sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
+compute_time_graph(sigma, 30)
 #+end_src
 
 #+RESULTS:
