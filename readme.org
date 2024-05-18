@@ -338,10 +338,10 @@ We can see that while both perform equally as well, JAX maintains roughly double
 I also ran the complexity on the PC. These are the results
 
 #+begin_src R :session example :results none
-jax_times_pc <- cbind(1:100,read.csv("./data/JAX_compute_times_pc.csv", header = FALSE)) %>%
+jax_times_pc <- cbind(1:100,read.csv("./data/JAX_compute_times-pc-1.csv", header = FALSE)) %>%
   mutate(proc = "JAX")
 names(jax_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-scala_times_pc <- cbind(1:100,read.csv("./data/scala_compute_times_pc.csv", header = FALSE)) %>%
+scala_times_pc <- cbind(1:100,read.csv("./data/scala_compute_times-pc-1.csv", header = FALSE)) %>%
   mutate(proc = "Scala")
 names(scala_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
 #+end_src
@@ -422,3 +422,40 @@ print(time_graph_laptop_2)
 [[file:./Figures/plot_complexity_laptop_2.png]]
 
 The JAX performance is significantly worse after the cache is filled, and consistently so! I have no idea what is causing this, it is the same code that was ran on the PC.
+
+
+
+* Newsest (MAY)
+
+
+#+begin_src R :session example :results none
+jax_times_pc <- cbind(1:100,read.csv("./data/JAX_compute_times-pc-1.csv", header = FALSE)) %>%
+  mutate(proc = "JAX")
+names(jax_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+scala_times_pc <- cbind(1:100,read.csv("./data/scala_compute_times-pc-1.csv", header = FALSE)) %>%
+  mutate(proc = "Scala")
+names(scala_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+R_times_pc <- cbind(1:30,read.csv("./data/R_compute_times-pc-1.csv", header = FALSE)) %>%
+  mutate(proc = "R")
+names(R_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+#+end_src
+
+
+
+#+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_pc.png :width 1000 :exports both
+data <- rbind(jax_times_pc, scala_times_pc)
+print(ascii(head(data)), type = "org")
+
+time_graph_pc <- ggplot(data, aes(x = d, y = time, color = proc)) +
+  geom_line(size = 2) +
+  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
+  theme_minimal() + 
+  labs(title = "Compute Time against Dimension (Ryzen 7 5800X, 16Gb RAM, )",
+       x = "Dimension",
+       y = "Compute Time (seconds)") +
+  theme(text = element_text(size = 20))
+print(time_graph_pc)
+#+end_src
+
+#+RESULTS:
+[[file:./Figures/plot_complexity_pc.png]]
