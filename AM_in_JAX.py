@@ -14,6 +14,16 @@ jax.config.update('jax_enable_x64', True)
 
 def try_accept(state, prop, alpha, key):
 
+  """ Accepts a proposed move from ~state~ with probability ~exp(min(0,alpha))~
+  
+  state -- A tuple for the state of the chain, in the format ~(j, x, x_mean, prop_cov)~
+  prop -- The proposed move, x
+  alpha -- The pre-calculated log of the Hastings ratio
+  key -- PRNG keys
+
+  return -- The next state (tuple) of the chain with updated mean and covariance
+  """
+
   j       = state[0]
   x       = state[1]
   x_mean  = state[2]
@@ -30,6 +40,7 @@ def try_accept(state, prop, alpha, key):
 
   x_mean_new = x_mean*(j-1)/j  + x_new/j
 
+  # Implements the covariance update equation
   prop_cov_new = jl.cond(j <= 2*d,
                          j,
                          lambda t: prop_cov,
@@ -37,6 +48,7 @@ def try_accept(state, prop, alpha, key):
                          lambda t: prop_cov*(t-1)/t + (t*jnp.outer(x_mean,x_mean) - (t+1)*jnp.outer(x_mean_new,x_mean_new) + jnp.outer(x_new,x_new) + 0.01*jnp.identity(d))*5.6644/(t*d))
   
   # NOTE: seems inefficient to construct a diagonal identity matrix like this, I would imagine there is a better way to do this
+  
   return((j + 1,
           x_new,
           x_mean_new,
@@ -45,7 +57,16 @@ def try_accept(state, prop, alpha, key):
 
 def adapt_step(state, q, r, key):
 
-    j        = state[0] # this is an int32, not big enough when i square it below!
+    """ Samples from the current proposal distribution and computes the log Hastings Ratio, and returns the next state according to ~try_accept~
+
+    state -- A tuple for the state of the chain, in the format ~(j, x, x_mean, prop_cov)~
+    q,r -- The QR-decomposition of the target Covariance, for computing the inverse
+    key -- PRNG key
+
+    return -- The next state of the chain
+    """
+    
+    j        = state[0]
     x        = state[1]
     prop_cov = state[3]
     d        = x.shape[0]
@@ -54,7 +75,7 @@ def adapt_step(state, q, r, key):
     
     prop = rand.multivariate_normal(keys[0], x, prop_cov)
 
-    # Compute the log acceptance probability
+    # Compute the log Hastings ratio
     alpha = 0.5 * (x.T @ (solve(r, q.T @ x))
                    - (prop.T @ solve(r, q.T @ prop)))
 
@@ -72,7 +93,19 @@ def cov(sample):
     
     return covariance
 
+def thinned_step(thinrate, state, q, r, key):
+
+    """Performs ~thinrate~ iterations of adapt_step, withour saving the intermiade steps"""
+    
+    keys = rand.split(key,thinrate)
+
+    # I think this should scan over the keys!
+    return jl.fori_loop(0, thinrate, (lambda i, x: adapt_step(x, q, r, keys[i])), state)
+
 def effectiveness(sigma, sigma_j):
+
+    """Computes the sub-optimality factor between the true target covarinance ~sigma~ and the sampling covariance ~sigma_j~, from Roberts and Rosethal
+    """
 
     d = sigma.shape[0]
     
@@ -92,6 +125,8 @@ def effectiveness(sigma, sigma_j):
     return b
 
 def plotter(sample, file_path, d):
+
+    """Plots a trace plot of the dth coordinate of the given array of states, and saves the figure to ~file_path~"""
     
     first = sample[:,0]
     plt.figure(figsize=(590/96,370/96))
@@ -104,10 +139,15 @@ def plotter(sample, file_path, d):
 
 def run_with_complexity(sigma_d, key):
 
-    Q, R = qr(sigma_d) # take the QR decomposition of sigma
+    """Runs the main loop on a given target Covariance, and gets the time the main loop took.
 
-    # since I'm timing, this is not a pure function, so
-    # it won't work completely through JAX.
+    sigma_d -- The target covariance to sample from, usually a submatrix of ~chaotic_variance.csv~
+    key -- PRNG key
+
+    return -- A tuple containing results of the test, including the duration and suboptimality factor
+    """
+
+    Q, R = qr(sigma_d) # take the QR decomposition of sigma
 
     d = sigma_d.shape[0]
     
@@ -140,6 +180,9 @@ def run_with_complexity(sigma_d, key):
     return n, thinrate, burnin, duration, float(b) # making it into a normal float for readability
 
 def compute_time_graph(sigma, csv_file):
+
+    """Loop through all the primary minors of ~sigma~ and runs the complexity test on each of them, saving the result to ~csv_file~
+    """
     
     d = sigma.shape[0]
 
@@ -153,14 +196,10 @@ def compute_time_graph(sigma, csv_file):
         writer = csv.writer(csvfile)
         writer.writerows(y)
 
-def thinned_step(thinrate, state, q, r, key):
-
-    keys = rand.split(key,thinrate)
-
-    # I think this should scan over the keys!
-    return jl.fori_loop(0, thinrate, (lambda i, x: adapt_step(x, q, r, keys[i])), state)
-
 def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace_JAX.png"):
+
+    """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.
+    """
 
     # the actual number of iterations is n*thin + burnin
     # computed_size = n*thinrate + burnin
@@ -193,6 +232,7 @@ def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace
     # the sample
     am_sample = jl.scan(step, start_state, keys[burnin+1:])[1]
 
+    # the tiume of the computation in seconds
     end_time = time.time()
     duration = time.time()-start_time
     
@@ -200,8 +240,6 @@ def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace
     sigma_j = cov(am_sample[1])
     b = effectiveness(sigma,sigma_j)
 
-    # the tiume of the computation in seconds
-    
     print(f"The true variance of x_1 is {sigma[0,0]}")
     print(f"The empirical sigma value is {sigma_j[0,0]}")
     print(f"The b value is {b}")
@@ -217,13 +255,19 @@ if __name__ == "__main__":
     #test_adapt_step()
     #test_AM_hstep()
     #test_thinned_step()
-    #main()
+    
+    main(file ="Figures/adaptive_trace_JAX_d_10.png")
+    
     #or high dimensions
+    
     #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
-    matrix = []
-    with open('./data/chaotic_variance.csv', 'r', newline='') as file:
-        reader = csv.reader(file)
-        for row in reader:
-            matrix.append([float(item) for item in row])
-    sigma = jnp.array(matrix)
-    compute_time_graph(sigma, "data/JAX_compute_times.csv")
+
+    # For computing the time graph
+    
+    #matrix = []
+    #with open('./data/chaotic_variance.csv', 'r', newline='') as file:
+    #    reader = csv.reader(file)
+    #    for row in reader:
+    #        matrix.append([float(item) for item in row])
+    #sigma = jnp.array(matrix)
+    #compute_time_graph(sigma, "data/JAX_compute_times.csv")

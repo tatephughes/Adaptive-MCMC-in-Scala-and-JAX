@@ -1,4 +1,5 @@
 library(MASS)
+library(ggplot2)
 
 try_accept <- function(state, prop, alpha){
 
@@ -59,7 +60,97 @@ thinned_step <- function(thinrate, state, q, r){
   return(state)
 }
 
-main <- function(d=10,n=100000, thinrate=10, burnin=10000){
+effectiveness <- function(sigma, sigma_j){
+
+  d = sqrt(length(sigma)) # must be like this because 'dim' doesn't work for the 1D case 
+  
+  sigma_j_decomp = eigen(sigma_j)
+  sigma_decomp = eigen(sigma)
+  
+  rootsigmaj = sigma_j_decomp$vectors %*% diag(sqrt(sigma_j_decomp$values), nrow=d) %*% solve(sigma_j_decomp$vectors)
+  rootsigmainv = sigma_decomp$vectors %*% diag(1/sqrt(sigma_decomp$values), nrow=d) %*% solve(sigma_decomp$vectors)
+
+  lam = eigen(rootsigmaj %*% rootsigmainv)$values
+  lambdaminus2sum = sum(1/(lam^2))
+  lambdainvsum = sum(1/lam)
+
+  b = (d * (lambdaminus2sum / (lambdainvsum*lambdainvsum)))
+
+  return(b)
+}
+
+plotter <- function(sample, filepath, d){
+  
+  y <- sapply(sample, function(i){i$x[d]})
+
+  df <- data.frame(index = seq_along(y), value = y)
+
+  trace_plot <- ggplot(df, aes(x = index, y = value)) +
+    geom_line(col = "#00ABFD") +
+    ylab("First Coordinate Value") +
+    xlab("Step") +
+    labs(title = "Trace plot of the first coordinate in R")
+
+  ggsave(filepath, plot = trace_plot, width = 590/96, height = 370/96, dpi = 96)
+}
+
+run_with_complexity <- function(sigma_d){
+
+  qr <- qr(sigma_d)
+  Q <- qr.Q(qr)
+  R <- qr.R(qr) # take the QR decomposition of sigma
+
+  d = sqrt(length(sigma_d))
+  
+  n = 10000
+  thinrate = 10
+  burnin = 1000000
+
+  state <- list(j = 1, x = rep(0,d), x_mean = rep(0,d), prop_cov = (0.1)^2*diag(d)/d)
+  
+  sample <- rep(0,n)
+
+  start_time = Sys.time()
+  
+  # burnin
+  for (i in 1:burnin) {
+    state <- adapt_step(state, Q, R)
+  }
+
+  # after burnin
+  for (i in 1:n) {
+    state <- thinned_step(thinrate, state, Q, R)
+    sample[[i]] <- state
+  }
+
+  end_time <- Sys.time()
+  duration <- as.numeric(difftime(end_time, start_time, units="secs"))
+  
+  sigma_j <- cov(do.call(rbind,
+                        lapply(sample, function(y){y$x})))
+
+  b = effectiveness(sigma_d ,sigma_j)
+  
+  return(c(n, thinrate, burnin, duration, b))
+}
+
+compute_time_graph <- function(sigma, d){
+  
+  y <- matrix(rep(0, 5*d), ncol=5)
+  
+  for (i in 1:d) {
+
+    y[i, ] <-run_with_complexity(sigma[1:i,1:i])
+
+    print(i)
+    
+  }
+
+  write.table(y, "./data/R_compute_times.csv", sep = ",", col.names = FALSE, row.names = FALSE)
+
+}
+
+main <- function(d=10,n=100000, thinrate=10, burnin=10000, filepath){
   
   M <- matrix(rnorm(d^2), nrow = d)
   sigma <- t(M) %*% M
@@ -95,84 +186,13 @@ main <- function(d=10,n=100000, thinrate=10, burnin=10000){
   print(paste("The empirical sigma value is", sigma_j[1,1]))
   print(paste("The b value is", b))
   print(paste("The computation took", as.numeric(duration), "seconds"))
+
+  plotter(sample, filepath, 1)
+  
+  return(sample)
 }
 
-effectiveness <- function(sigma, sigma_j){
-
-  d = sqrt(length(sigma)) # must be like this because 'dim' doesn't work for the 1D case 
-  
-  sigma_j_decomp = eigen(sigma_j)
-  sigma_decomp = eigen(sigma)
-  
-  rootsigmaj = sigma_j_decomp$vectors %*% diag(sqrt(sigma_j_decomp$values), nrow=d) %*% solve(sigma_j_decomp$vectors)
-  rootsigmainv = sigma_decomp$vectors %*% diag(1/sqrt(sigma_decomp$values), nrow=d) %*% solve(sigma_decomp$vectors)
-
-  lam = eigen(rootsigmaj %*% rootsigmainv)$values
-  lambdaminus2sum = sum(1/(lam^2))
-  lambdainvsum = sum(1/lam)
-
-  b = (d * (lambdaminus2sum / (lambdainvsum*lambdainvsum)))
-
-  return(b)
-}
-
-run_with_complexity <- function(sigma_d){
-
-  qr <- qr(sigma_d)
-  Q <- qr.Q(qr)
-  R <- qr.R(qr) # take the QR decomposition of sigma
-
-  d = sqrt(length(sigma_d))
-  
-  n = 10000
-  thinrate = 10
-  burnin = 1000000
-
-  state <- list(j = 1, x = rep(0,d), x_mean = rep(0,d), prop_cov = (0.1)^2*diag(d)/d)
-  
-  sample <- vector("list", n)
-
-  start_time = Sys.time()
-  
-  # burnin
-  for (i in 1:burnin) {
-    state <- adapt_step(state, Q, R)
-  }
-
-  # after burnin
-  for (i in 1:n) {
-    state <- thinned_step(thinrate, state, Q, R)
-    sample[[i]] <- state
-  }
-
-  end_time <- Sys.time()
-  duration <- as.numeric(difftime(end_time, start_time, units="secs"))
-  
-  sigma_j <- cov(do.call(rbind,
-                        lapply(sample, function(y){y$x})))
-
-  b = effectiveness(sigma_d ,sigma_j)
-  
-  return(c(n, thinrate, burnin, duration, b))
-}
-
-compute_time_graph <- function(sigma, d){
-  
-  y <- vector("list", d)
-  
-  for (i in 1:d) {
-
-    y[[i]] <-run_with_complexity(sigma[1:i,1:i])
-
-    print(i)
-    
-  }
-
-  write.csv(y, "./data/R_compute_times.csv", row.names = FALSE)
-
-}
-
-#main(d=10,n=100000, thinrate=10, burnin=10000)
+main(d=10,n=100000, thinrate=10, burnin=10000, filepath = "./Figures/adaptive_trace_r_d_10.png")
 
 sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
-compute_time_graph(sigma, 30)
+#compute_time_graph(sigma, 30)

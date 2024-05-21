@@ -1,4 +1,3 @@
-
 import breeze.plot._
 import breeze.linalg._
 import breeze.numerics._
@@ -189,7 +188,7 @@ object AdaptiveMetropolis:
 
   }
     
-  @main def run(): Unit =
+  def run(): Unit =
 
     // Read the file lines, skipping empty lines
     val lines = Source.fromFile("data/chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
@@ -206,7 +205,7 @@ object AdaptiveMetropolis:
 
     compute_time_graph(sigma_d, "data/scala_compute_times.csv")
 
-  def simple_run(): Unit = 
+  @main def simple_run(): Unit = 
 
     val d: Int = 10
     val n: Int = 100000        // size of the desired sample
@@ -254,4 +253,4 @@ object AdaptiveMetropolis:
     print("\nThe b value is " + b)
     print("\nThe computation took " + duration + " seconds" )
 
-    plotter(am_sample.map(_.x), "./Figures/adaptive_trace_scala_high_d.png")
+    plotter(am_sample.map(_.x), "./Figures/adaptive_trace_scala_d_10.png")

@@ -1,8 +1,7 @@
 #+TITLE: AM in Python-JAX
-#+PROPERTY: header-args :tangle AM_in_JAX.py
-#+auto_tangle: t
 
 :BOILERPLATE:
+#+PROPERTY: header-args :tangle AM_in_JAX.py
 #+BIBLIOGRAPHY: Bibliography.bib
 #+LATEX_CLASS: article
 #+LATEX_CLASS_OPTIONS: [letterpaper]
@@ -37,11 +36,9 @@ This file _is_ the source code; everything below gets 'tangled' into ~AM_in_JAX.
 
 ** Shabang
 
-#+begin_src python :session example :results output
+#+begin_src python :session example :results none
 #!/usr/bin/env python3
 #+end_src
-
-#+RESULTS:
 
 ** Imports
 
@@ -58,6 +55,11 @@ import csv
 #+end_src
 
 ** Test Imports
+
+The test functions are out-of-date and no longer functional
+
+*************** TODO [#C] Update the tests for AM in JAX :projects:
+*************** END
 
 #+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
 import matplotlib.pyplot as plt
@@ -82,6 +84,8 @@ Without this however, the precision is not enough at higher dimensions.
 jax.config.update('jax_enable_x64', True)
 #+end_src
 
+With the new method of computing and updating the covariance matrix, this may no longer need to be used. 
+
 * Core Functions
 
 Let's assume that the ~state~ is a tuple with four elements, instead of it's own class. JAX reads this as a PyTree, which it is happy to preform operations on (which wouldn't be the case if I made ~state~ a class like in the Scala version)
@@ -92,8 +96,24 @@ More specificaly, ~state = (j, x, x_mean, prop_cov)~.
 
 This function takes a state, a proposed move, and a log probabilty, and returns the next state, using the probability as expected.
 
+It outputs the next state, updating the mean and covariance by
+\begin{align*}
+\vec{\overline{X}}_t &= \frac{t-1}{t} \vec{\overline{X}}_{t-1} + \frac{1}{t} \vec X_t, \\
+\mat C_{t+1} &= \frac{t-1}{t} \mat C_t + \frac{s_d}{t}(t\vec{\overline{X}}_{t-1}\vec{\overline{X}}_{t-1}^{\intercal} - (t+1)\vec{\overline{X}}_t\vec{\overline{X}}_t^{\intercal} + \vec X_t\vec X_t^{\intercal} + \epsilon \mat I_d),\quad t\geq t_0.
+\end{align*}
+
 #+begin_src python :session example :results none
 def try_accept(state, prop, alpha, key):
+
+  """ Accepts a proposed move from ~state~ with probability ~exp(min(0,alpha))~
+  
+  state -- A tuple for the state of the chain, in the format ~(j, x, x_mean, prop_cov)~
+  prop -- The proposed move, x
+  alpha -- The pre-calculated log of the Hastings ratio
+  key -- PRNG keys
+
+  return -- The next state (tuple) of the chain with updated mean and covariance
+  """
 
   j       = state[0]
   x       = state[1]
@@ -111,6 +131,7 @@ def try_accept(state, prop, alpha, key):
 
   x_mean_new = x_mean*(j-1)/j  + x_new/j
 
+  # Implements the covariance update equation
   prop_cov_new = jl.cond(j <= 2*d,
                          j,
                          lambda t: prop_cov,
@@ -118,6 +139,7 @@ def try_accept(state, prop, alpha, key):
                          lambda t: prop_cov*(t-1)/t + (t*jnp.outer(x_mean,x_mean) - (t+1)*jnp.outer(x_mean_new,x_mean_new) + jnp.outer(x_new,x_new) + 0.01*jnp.identity(d))*5.6644/(t*d))
   
   # NOTE: seems inefficient to construct a diagonal identity matrix like this, I would imagine there is a better way to do this
+  
   return((j + 1,
           x_new,
           x_mean_new,
@@ -125,7 +147,7 @@ def try_accept(state, prop, alpha, key):
           is_accepted))
 #+end_src
 
-*** ~test_try_accept~
+*** ~test_try_accept~ [OUT OF DATE]
 
 The below code block does a few tests on the ~try_accept~ function. If the tests pass, it will return ~True~, otherwise it will throw an error.
 
@@ -189,23 +211,29 @@ def test_try_accept():
 
 ** ~adapt_step~
 
-The actually adaptive part, implementing a step with proposal
+This samples from the proposal distribution and computes the Hastings ratio;
 \begin{align*}
 q(\vec X_t^* \mid \vec X_0, \dots, X_{t-1}) \sim \mathcal N_d (\vec X_{t-1}, \mat C_t),
 \end{align*}
-where
+
+with Hastings Ratio
 \begin{align*}
-C_j =
-\begin{cases}
-\mat s_d \Sigma_0 &\quad j \leq j_0,\\
-s_d(\Sigma_{j-1} + \epsilon \mat I_d) &\quad j>j_0=2d.
-\end{cases}
+\alpha = \frac12 \left[ \vec x^{\intercal} \mat \Sigma^{-1} \vec x - \vec x^{*\intercal} \mat \Sigma^{-1}\vec x^{*}\right].
 \end{align*}
 
 #+begin_src python :session example :results none
 def adapt_step(state, q, r, key):
 
-    j        = state[0] # this is an int32, not big enough when i square it below!
+    """ Samples from the current proposal distribution and computes the log Hastings Ratio, and returns the next state according to ~try_accept~
+
+    state -- A tuple for the state of the chain, in the format ~(j, x, x_mean, prop_cov)~
+    q,r -- The QR-decomposition of the target Covariance, for computing the inverse
+    key -- PRNG key
+
+    return -- The next state of the chain
+    """
+    
+    j        = state[0]
     x        = state[1]
     prop_cov = state[3]
     d        = x.shape[0]
@@ -214,14 +242,14 @@ def adapt_step(state, q, r, key):
     
     prop = rand.multivariate_normal(keys[0], x, prop_cov)
 
-    # Compute the log acceptance probability
+    # Compute the log Hastings ratio
     alpha = 0.5 * (x.T @ (solve(r, q.T @ x))
                    - (prop.T @ solve(r, q.T @ prop)))
 
     return(try_accept(state, prop, alpha, keys[1]))
 #+end_src
 
-*** ~test_adapt_step~
+*** ~test_adapt_step~ [OUT OF DATE]
 
 #+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
 def test_adapt_step():
@@ -268,13 +296,64 @@ def cov(sample):
     return covariance
 #+end_src
 
+** ~thinned_step~
+
+ ~thinned_step~ uses a fori_loop to 'jump' steps, which JAX knows how to garbage collect. This is especially important for high dimensional samples.
+
+#+begin_src python :session example :results none
+def thinned_step(thinrate, state, q, r, key):
+
+    """Performs ~thinrate~ iterations of adapt_step, withour saving the intermiade steps"""
+    
+    keys = rand.split(key,thinrate)
+
+    # I think this should scan over the keys!
+    return jl.fori_loop(0, thinrate, (lambda i, x: adapt_step(x, q, r, keys[i])), state)
+#+end_src
+
+*** ~test_thinned_step~
+
+#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
+def test_thinned_step():
+
+    d = 2
+    n = 1000
+    thinrate = 10
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    # this state was chosen being close to an actual state of the adaptive chain
+    state = (100, jnp.zeros(2), jnp.array([-80.0,-5.0]), jnp.array([[260.0,100.0],[100.0,150.0]]), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+    
+    '''
+    Test 1:
+    the index of a state should increase by thinrate
+    '''
+    assert (thinned_step(thinrate, state, Q, R, keys[0])[0] == 100+thinrate), "thinned_step not correctly incrementing step count"
+
+    return True
+  
+#+end_src
 
 * ~effectiveness~
 
-** TODO Fix the eigenvalue computation with a change of coordinate
+Computes the 'suboptimility factor' from Roberts and Rosenthal,
+$$\begin{aligned}
+b = d\frac{\sum \lambda_i^{-2}}{(\sum \lambda_i^{-1})^2 },
+\end{aligned}$$
+where $\lamba_{i}$ are the eigenvalues of $\mat C_i^{1/2}\mat\Sigma^{-1/2}$ Currently , this is only used on the sample covariance of the generated chain, which is not how it is mean to be used. It is meant to be applied to the sampling covariance within the chain. It is also inefficient currently, and could be improved using a change of coordinate to use ~eigh~ instead of ~eig~, which would also allow it to work on GPU.
+
+*************** TODO Fix the eigenvalue computation with a change of coordinate :project:
+*************** TODO Compute b on the sampling covariance, not the sample covariance :project:
+*************** END
+
 
 #+begin_src python :session example :results none
 def effectiveness(sigma, sigma_j):
+
+    """Computes the sub-optimality factor between the true target covarinance ~sigma~ and the sampling covariance ~sigma_j~, from Roberts and Rosethal
+    """
 
     d = sigma.shape[0]
     
@@ -294,13 +373,14 @@ def effectiveness(sigma, sigma_j):
     return b
 #+end_src
 
+* Plotting
 
-* plotting
-
-Exactly as in the Scala version, simply plots the trace of the first coordinate of the given sample, and saves it to a file.
+Plots the trace of the first coordinate of the given sample, and saves it to a file.
 
 #+begin_src python :session example :results none
 def plotter(sample, file_path, d):
+
+    """Plots a trace plot of the dth coordinate of the given array of states, and saves the figure to ~file_path~"""
     
     first = sample[:,0]
     plt.figure(figsize=(590/96,370/96))
@@ -313,18 +393,24 @@ def plotter(sample, file_path, d):
 
 #+end_src
 
-
 * Compute time vs. dimension
 
 ** ~run_with_complexity~
 
+This runs the main loop with an extra duration output, so that speed tests can be run
+
 #+begin_src python :session example :results none
 def run_with_complexity(sigma_d, key):
 
-    Q, R = qr(sigma_d) # take the QR decomposition of sigma
+    """Runs the main loop on a given target Covariance, and gets the time the main loop took.
 
-    # since I'm timing, this is not a pure function, so
-    # it won't work completely through JAX.
+    sigma_d -- The target covariance to sample from, usually a submatrix of ~chaotic_variance.csv~
+    key -- PRNG key
+
+    return -- A tuple containing results of the test, including the duration and suboptimality factor
+    """
+
+    Q, R = qr(sigma_d) # take the QR decomposition of sigma
 
     d = sigma_d.shape[0]
     
@@ -359,8 +445,13 @@ def run_with_complexity(sigma_d, key):
 
 ** ~compute_time_graph~
 
+This goes through sub-matrices of ~sigma~ in order to make data detailing dimension against time, for plotting.
+
 #+begin_src python :session example :results none
 def compute_time_graph(sigma, csv_file):
+
+    """Loop through all the primary minors of ~sigma~ and runs the complexity test on each of them, saving the result to ~csv_file~
+    """
     
     d = sigma.shape[0]
 
@@ -375,52 +466,15 @@ def compute_time_graph(sigma, csv_file):
         writer.writerows(y)
 #+end_src
 
-
-* ~thinned_step~
-
-Thinning as I've done it above is not memory efficient; it stores all ~n~ states and only thins right at the end. Instead, the function ~thinned_step~ uses a fori_loop to 'jump' steps, which JAX knows how to garbage collect. This is especially important for high dimensional samples, as below.
-
-#+begin_src python :session example :results none
-def thinned_step(thinrate, state, q, r, key):
-
-    keys = rand.split(key,thinrate)
-
-    # I think this should scan over the keys!
-    return jl.fori_loop(0, thinrate, (lambda i, x: adapt_step(x, q, r, keys[i])), state)
-#+end_src
-
-** ~test_thinned_step~
-
-#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
-def test_thinned_step():
-
-    d = 2
-    n = 1000
-    thinrate = 10
-    key = jax.random.PRNGKey(seed=1)
-    keys = rand.split(key,n)
-    # this state was chosen being close to an actual state of the adaptive chain
-    state = (100, jnp.zeros(2), jnp.array([-80.0,-5.0]), jnp.array([[260.0,100.0],[100.0,150.0]]), False)
-    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
-    Q, R = qr(sigma)
-    
-    '''
-    Test 1:
-    the index of a state should increase by thinrate
-    '''
-    assert (thinned_step(thinrate, state, Q, R, keys[0])[0] == 100+thinrate), "thinned_step not correctly incrementing step count"
-
-    return True
-  
-#+end_src
-
-
 * ~main~
 
 Due to memory constraints and garbage collection not being quite as magical, we do burn-in seperately to the main sampling.
 
 #+begin_src python :session example :results none
 def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace_JAX.png"):
+
+    """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.
+    """
 
     # the actual number of iterations is n*thin + burnin
     # computed_size = n*thinrate + burnin
@@ -453,6 +507,7 @@ def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace
     # the sample
     am_sample = jl.scan(step, start_state, keys[burnin+1:])[1]
 
+    # the tiume of the computation in seconds
     end_time = time.time()
     duration = time.time()-start_time
     
@@ -460,8 +515,6 @@ def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace
     sigma_j = cov(am_sample[1])
     b = effectiveness(sigma,sigma_j)
 
-    # the tiume of the computation in seconds
-    
     print(f"The true variance of x_1 is {sigma[0,0]}")
     print(f"The empirical sigma value is {sigma_j[0,0]}")
     print(f"The b value is {b}")
@@ -482,18 +535,23 @@ if __name__ == "__main__":
     #test_adapt_step()
     #test_AM_hstep()
     #test_thinned_step()
-    #main()
+    
+    main(file ="Figures/adaptive_trace_JAX_d_10.png")
+    
     #or high dimensions
+    
     #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
-    matrix = []
-    with open('./data/chaotic_variance.csv', 'r', newline='') as file:
-        reader = csv.reader(file)
-        for row in reader:
-            matrix.append([float(item) for item in row])
-    sigma = jnp.array(matrix)
-    compute_time_graph(sigma, "data/JAX_compute_times.csv")
-#+end_src
 
+    # For computing the time graph
+    
+    #matrix = []
+    #with open('./data/chaotic_variance.csv', 'r', newline='') as file:
+    #    reader = csv.reader(file)
+    #    for row in reader:
+    #        matrix.append([float(item) for item in row])
+    #sigma = jnp.array(matrix)
+    #compute_time_graph(sigma, "data/JAX_compute_times.csv")
+#+end_src
 
 * Test Area
 

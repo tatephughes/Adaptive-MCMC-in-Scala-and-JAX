@@ -33,15 +33,14 @@ This is based on the example from the article "Examples of Adaptive MCMC" by Rob
 
 A AMRTH step is defined as follows;
 - If $j\leq 2d$, we do a MRTH step with proposal $q(x,\cdot)\sim \mathcal N(x,(0.1)^2I_d/d)$
-- If $j>2d$, we use the proposal $q(x,\cdot)\sim(1-\beta)\mathcal N(x,(2.38)^2\Sigma_j/d)+\beta\mathcal N(x,(0.1)^2I_d/d)$, where $\Sigma_j$ is the current empirical estimate of the covariance matrix so far.
-
+- If $j>2d$, we use the proposal $q(\vec X_t^* \mid \vec X_0, \dots, X_{t-1}) \sim \mathcal N_d (\vec X_{t-1}, \mat C_j)$, where $C_j$ is the current sampling covariance, updated as below.
+  
 We can compute the empirical covariance matrix at step $j$ by
-
-$$\begin{aligned}
-\Sigma_j=\frac{{\sum_{i=0}^j} x_ix_i^{\intercal}}{j} - \frac{({\sum_{i=0}^j} x_i)({\sum_{i=0}^j} x_i)^{\intercal}}{j^2}.
-\end{aligned}$$
-
-The logic I'm using is to carry forward $\sum x_ix_i^{\intercal}$ and $\sum x_i$ (as well as the current index, $j$) as part of our 'chain', in order to compute the empirical covariance matrix as we go along (I should possibly do a $\frac{n}{n-1}$ transformation to this matrix too), in order to sample from the proposal when $j>2d$ .
+\begin{align*}
+\vec{\overline{X}}_t &= \frac{t-1}{t} \vec{\overline{X}}_{t-1} + \frac{1}{t} \vec X_t, \\
+\mat C_{t+1} &= \frac{t-1}{t} \mat C_t + \frac{s_d}{t}(t\vec{\overline{X}}_{t-1}\vec{\overline{X}}_{t-1}^{\intercal} - (t+1)\vec{\overline{X}}_t\vec{\overline{X}}_t^{\intercal} + \vec X_t\vec X_t^{\intercal} + \epsilon \mat I_d),\quad t\geq t_0.
+\end{align*}
+The logic I'm using is to carry forward $\vec{\overline x}$ and $C_j$ (as well as the current index, $j$) as part of our 'chain', in order to sample from the proposal.
 
 ** Measure of effectiveness
 
@@ -80,15 +79,16 @@ My Scala implementation of this is found in ~Main.scala~ (it needs cleanup thoug
 - ~AM_step~, which takes the current state as well as the QR decomposition of the true variance, and outputs the next state of the chain.
 - ~AM_iterator~, which iterates ~AM_step~ in order to create an infinite lazy list of samples.
 - ~plotter~, which plots the 1st componant of the sample, and saves it to a file.
-
   
 The ~run~ function then tests this, using ~d=10~, ~n=100000~, ~burnin=100000~ and ~thinrate=10~. This function, once it finishes, prints out the true variance of $x_1$, the empirical estimate of it from the sample, the $b$ value, and the time the computation took. A trace plot of $x_1$ is also saved to ~Figures/adaptive_trace_scala.png~.
 
+*** TODO Properly Document and Comment the Scala code :projects:
+
 * JAX implementation
 
-As you might imagine, the JAX implentation is very similar, even if it is a bit more fragmented. The ~AM_step~ function is split into four functions, ~try_accept~, ~init_step~, ~adapt_step~, and ~AM_step~. This is mainly due to the way JAX handles ~if else~ statements, making this seem like the convenient way to do it.
+As you might imagine, the JAX implentation is very similar, even if it is a bit more fragmented. The ~AM_step~ function is split into twofunctions, ~try_accept~, and ~adapt_step~. This is mainly due to the way JAX handles ~if else~ statements, making this seem like the convenient way to do it.
 
-In the file ~AM_in_JAX.org~ (or ~.md~), there is the source code as well as documentation for all the functions, but it is very similar to the scala version.
+In the file ~AM_in_JAX.org~, there is the source code as well as documentation for all the functions, but it is very similar to the scala version.
 
 * Results
 
@@ -426,7 +426,6 @@ The JAX performance is significantly worse after the cache is filled, and consis
 
 
 * Newsest (MAY)
-
 
 #+begin_src R :session example :results none
 jax_times_pc <- cbind(1:100,read.csv("./data/JAX_compute_times-pc-1.csv", header = FALSE)) %>%

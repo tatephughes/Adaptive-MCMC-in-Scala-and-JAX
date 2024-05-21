@@ -1,12 +1,56 @@
 #+TITLE: Adaptive Metropolis in R
 
-* imports
+:BOILERPLATE:
+#+BIBLIOGRAPHY: Bibliography.bib
+#+LATEX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [letterpaper]
+#+OPTIONS: toc:nil
+#+LATEX_HEADER: \usepackage{amsmath,amsfonts,amsthm,amssymb,bm,bbm,tikz,tkz-graph}
+#+LATEX_HEADER: \usetikzlibrary{arrows}
+#+LATEX_HEADER: \usetikzlibrary{bayesnet}
+#+LATEX_HEADER: \usetikzlibrary{matrix}
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
+#+LATEX_HEADER: \usepackage[english]{babel}
+#+LATEX_HEADER: \newtheorem{theorem}{Theorem}[section]
+#+LATEX_HEADER: \newtheorem{corollary}[theorem]{Corollary}
+#+LATEX_HEADER: \newtheorem{lemma}[theorem]{Lemma}
+#+LATEX_HEADER: \newtheorem{definition}[theorem]{Definition}
+#+LATEX_HEADER: \newtheorem*{remark}{Remark}
+#+LATEX_HEADER: \DeclareMathOperator{\E}{\mathbb E}}
+#+LATEX_HEADER: \DeclareMathOperator{\prob}{\mathbb P}
+#+LATEX_HEADER: \DeclareMathOperator{\var}{\mathbb V\mathrm{ar}}
+#+LATEX_HEADER: \DeclareMathOperator{\cov}{\mathbb C\mathrm{ov}}
+#+LATEX_HEADER: \DeclareMathOperator{\cor}{\mathbb C\mathrm{or}}
+#+LATEX_HEADER: \DeclareMathOperator{\normal}{\mathcal N}
+#+LATEX_HEADER: \DeclareMathOperator{\invgam}{\mathcal{IG}}
+#+LATEX_HEADER: \newcommand*{\mat}[1]{\bm{#1}}
+#+LATEX_HEADER: \newcommand{\norm}[1]{\left\Vert #1 \right\Vert}
+#+LATEX_HEADER: \renewcommand*{\vec}[1]{\boldsymbol{\mathbf{#1}}}
+#+EXPORT_EXCLUDE_TAGS: noexport
+:END:
+
+This file _is_ the source code; everything below gets 'tangled' into ~AM_in_R.Rscript~.
+
+The code here is not fully commented, but since it is almost identical to the JAX code in logic, please refer to that code.
+
+* Boilerplate
 
 #+begin_src R :session example :results none :tangle AM_in_R.Rscript
 library(MASS)
+library(ggplot2)
 #+end_src
 
-* ~try_accept~
+* Core Functions
+** ~try_accept~
+
+This function takes a state, a proposed move, and a log probabilty, and returns the next state, using the probability as expected.
+
+It outputs the next state, updating the mean and covariance by
+\begin{align*}
+\vec{\overline{X}}_t &= \frac{t-1}{t} \vec{\overline{X}}_{t-1} + \frac{1}{t} \vec X_t, \\
+\mat C_{t+1} &= \frac{t-1}{t} \mat C_t + \frac{s_d}{t}(t\vec{\overline{X}}_{t-1}\vec{\overline{X}}_{t-1}^{\intercal} - (t+1)\vec{\overline{X}}_t\vec{\overline{X}}_t^{\intercal} + \vec X_t\vec X_t^{\intercal} + \epsilon \mat I_d),\quad t\geq t_0.
+\end{align*}
+
 
 #+begin_src R :session example :results nonee :tangle AM_in_R.Rscript
 try_accept <- function(state, prop, alpha){
@@ -45,7 +89,20 @@ try_accept <- function(state, prop, alpha){
 }
 #+end_src
 
-* ~adapt_step~
+#+RESULTS:
+
+** ~adapt_step~
+
+This samples from the proposal distribution and computes the Hastings ratio;
+\begin{align*}
+q(\vec X_t^* \mid \vec X_0, \dots, X_{t-1}) \sim \mathcal N_d (\vec X_{t-1}, \mat C_t),
+\end{align*}
+
+with Hastings Ratio
+\begin{align*}
+\alpha = \frac12 \left[ \vec x^{\intercal} \mat \Sigma^{-1} \vec x - \vec x^{*\intercal} \mat \Sigma^{-1}\vec x^{*}\right].
+\end{align*}
+
 
 #+begin_src R :session example :results none :tangle AM_in_R.Rscript
 adapt_step <- function(state, q, r){
@@ -66,7 +123,9 @@ adapt_step <- function(state, q, r){
 }
 #+end_src
 
-* ~thinned_step~
+** ~thinned_step~
+
+ ~thinned_step~ uses a fori_loop to 'jump' steps, which JAX knows how to garbage collect. This is especially important for high dimensional samples.
 
 #+begin_src R :session example :results none :tangle AM_in_R.Rscript
 thinned_step <- function(thinrate, state, q, r){
@@ -77,10 +136,130 @@ thinned_step <- function(thinrate, state, q, r){
 }
 #+end_src
 
+* ~effectiveness~
+
+Computes the 'suboptimility factor' from Roberts and Rosenthal,
+$$\begin{aligned}
+b = d\frac{\sum \lambda_i^{-2}}{(\sum \lambda_i^{-1})^2 },
+\end{aligned}$$
+where $\lamba_{i}$ are the eigenvalues of $\mat C_i^{1/2}\mat\Sigma^{-1/2}$ Currently , this is only used on the sample covariance of the generated chain, which is not how it is mean to be used. It is meant to be applied to the sampling covariance within the chain. 
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+effectiveness <- function(sigma, sigma_j){
+
+  d = sqrt(length(sigma)) # must be like this because 'dim' doesn't work for the 1D case 
+  
+  sigma_j_decomp = eigen(sigma_j)
+  sigma_decomp = eigen(sigma)
+  
+  rootsigmaj = sigma_j_decomp$vectors %*% diag(sqrt(sigma_j_decomp$values), nrow=d) %*% solve(sigma_j_decomp$vectors)
+  rootsigmainv = sigma_decomp$vectors %*% diag(1/sqrt(sigma_decomp$values), nrow=d) %*% solve(sigma_decomp$vectors)
+
+  lam = eigen(rootsigmaj %*% rootsigmainv)$values
+  lambdaminus2sum = sum(1/(lam^2))
+  lambdainvsum = sum(1/lam)
+
+  b = (d * (lambdaminus2sum / (lambdainvsum*lambdainvsum)))
+
+  return(b)
+}
+#+end_src
+
+* Plottings
+
+Plots the trace of the first coordinate of the given sample, and saves it to a file.
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+plotter <- function(sample, filepath, d){
+  
+  y <- sapply(sample, function(i){i$x[d]})
+
+  df <- data.frame(index = seq_along(y), value = y)
+
+  trace_plot <- ggplot(df, aes(x = index, y = value)) +
+    geom_line(col = "#00ABFD") +
+    ylab("First Coordinate Value") +
+    xlab("Step") +
+    labs(title = "Trace plot of the first coordinate in R")
+
+  ggsave(filepath, plot = trace_plot, width = 590/96, height = 370/96, dpi = 96)
+}  
+#+end_src
+
+* Compute Time vs. dimension
+
+** ~run_with_complexity~
+
+This runs the main loop with an extra duration output, so that speed tests can be run
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+run_with_complexity <- function(sigma_d){
+
+  qr <- qr(sigma_d)
+  Q <- qr.Q(qr)
+  R <- qr.R(qr) # take the QR decomposition of sigma
+
+  d = sqrt(length(sigma_d))
+  
+  n = 10000
+  thinrate = 10
+  burnin = 1000000
+
+  state <- list(j = 1, x = rep(0,d), x_mean = rep(0,d), prop_cov = (0.1)^2*diag(d)/d)
+  
+  sample <- rep(0,n)
+
+  start_time = Sys.time()
+  
+  # burnin
+  for (i in 1:burnin) {
+    state <- adapt_step(state, Q, R)
+  }
+
+  # after burnin
+  for (i in 1:n) {
+    state <- thinned_step(thinrate, state, Q, R)
+    sample[[i]] <- state
+  }
+
+  end_time <- Sys.time()
+  duration <- as.numeric(difftime(end_time, start_time, units="secs"))
+  
+  sigma_j <- cov(do.call(rbind,
+                        lapply(sample, function(y){y$x})))
+
+  b = effectiveness(sigma_d ,sigma_j)
+  
+  return(c(n, thinrate, burnin, duration, b))
+}
+#+end_src
+
+** ~compute_time_graph~
+
+This goes through sub-matrices of ~sigma~ in order to make data detailing dimension against time, for plotting.
+
+#+begin_src R :session example :results none :tangle AM_in_R.Rscript
+compute_time_graph <- function(sigma, d){
+  
+  y <- matrix(rep(0, 5*d), ncol=5)
+  
+  for (i in 1:d) {
+
+    y[i, ] <-run_with_complexity(sigma[1:i,1:i])
+
+    print(i)
+    
+  }
+
+  write.table(y, "./data/R_compute_times.csv", sep = ",", col.names = FALSE, row.names = FALSE)
+
+}
+#+end_src
+
 * ~main~
 
 #+begin_src R :session example :results none :tangle AM_in_R.Rscript
-main <- function(d=10,n=100000, thinrate=10, burnin=10000){
+main <- function(d=10,n=100000, thinrate=10, burnin=10000, filepath){
   
   M <- matrix(rnorm(d^2), nrow = d)
   sigma <- t(M) %*% M
@@ -116,109 +295,45 @@ main <- function(d=10,n=100000, thinrate=10, burnin=10000){
   print(paste("The empirical sigma value is", sigma_j[1,1]))
   print(paste("The b value is", b))
   print(paste("The computation took", as.numeric(duration), "seconds"))
-}
-#+end_src
 
-* ~effectiveness~
-
-#+begin_src R :session example :results none :tangle AM_in_R.Rscript
-effectiveness <- function(sigma, sigma_j){
-
-  d = sqrt(length(sigma)) # must be like this because 'dim' doesn't work for the 1D case 
+  plotter(sample, filepath, 1)
   
-  sigma_j_decomp = eigen(sigma_j)
-  sigma_decomp = eigen(sigma)
-  
-  rootsigmaj = sigma_j_decomp$vectors %*% diag(sqrt(sigma_j_decomp$values), nrow=d) %*% solve(sigma_j_decomp$vectors)
-  rootsigmainv = sigma_decomp$vectors %*% diag(1/sqrt(sigma_decomp$values), nrow=d) %*% solve(sigma_decomp$vectors)
-
-  lam = eigen(rootsigmaj %*% rootsigmainv)$values
-  lambdaminus2sum = sum(1/(lam^2))
-  lambdainvsum = sum(1/lam)
-
-  b = (d * (lambdaminus2sum / (lambdainvsum*lambdainvsum)))
-
-  return(b)
-}
-#+end_src
-
-* Time Graph
-
-** ~run_with_complexity~
-
-#+begin_src R :session example :results none :tangle AM_in_R.Rscript
-run_with_complexity <- function(sigma_d){
-
-  qr <- qr(sigma_d)
-  Q <- qr.Q(qr)
-  R <- qr.R(qr) # take the QR decomposition of sigma
-
-  d = sqrt(length(sigma_d))
-  
-  n = 10000
-  thinrate = 10
-  burnin = 1000000
-
-  state <- list(j = 1, x = rep(0,d), x_mean = rep(0,d), prop_cov = (0.1)^2*diag(d)/d)
-  
-  sample <- vector("list", n)
-
-  start_time = Sys.time()
-  
-  # burnin
-  for (i in 1:burnin) {
-    state <- adapt_step(state, Q, R)
-  }
-
-  # after burnin
-  for (i in 1:n) {
-    state <- thinned_step(thinrate, state, Q, R)
-    sample[[i]] <- state
-  }
-
-  end_time <- Sys.time()
-  duration <- as.numeric(difftime(end_time, start_time, units="secs"))
-  
-  sigma_j <- cov(do.call(rbind,
-                        lapply(sample, function(y){y$x})))
-
-  b = effectiveness(sigma_d ,sigma_j)
-  
-  return(c(n, thinrate, burnin, duration, b))
-}
-#+end_src
-
-** ~compute_time_graph~
-
-#+begin_src R :session example :results none :tangle AM_in_R.Rscript
-compute_time_graph <- function(sigma, d){
-  
-  y <- vector("list", d)
-  
-  for (i in 1:d) {
-
-    y[[i]] <-run_with_complexity(sigma[1:i,1:i])
-
-    print(i)
-    
-  }
-
-  write.csv(y, "./data/R_compute_times.csv", row.names = FALSE)
-
+  return(sample)
 }
 #+end_src
 
 * Test Area
 
 #+begin_src R :session example :results output :tangle AM_in_R.Rscript
-#main(d=10,n=100000, thinrate=10, burnin=10000)
+main(d=10,n=100000, thinrate=10, burnin=10000, filepath = "./Figures/adaptive_trace_r_d_10.png")
 
 sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
-compute_time_graph(sigma, 30)
+#compute_time_graph(sigma, 30)
+#+end_src
+
+
+t#+RESULTS:
+
+#+begin_src R :session example :results graphics file :file ~/test_plot.png :height 600 :width 1400 :exports both
+
+# The format of ~sample~ is actually kind of awkward, so we manually extract the relevant list of first coordinates
+
+n <- 100000
+d <- 1
+
+y <- sapply(sample, function(i){i$x[d]})
+
+df <- data.frame(index = seq_along(y), value = y)
+
+trace_plot <- ggplot(df, aes(x = index, y = value)) +
+  geom_line(col = "#00ABFD") +
+  ylab("First Coordinate Value") +
+  xlab("Step") +
+  labs(title = "Trace plot of the first coordinate in R")
+
+ggsave("my_plot.png", plot = p, width = 6, height = 4, dpi = 300)
+
 #+end_src
 
 #+RESULTS:
-: [1] "The true variance of x_1 is 8.22879600628684"
-: [1] "The empirical sigma value is 8.20496592343448"
-: [1] "The b value is 1.00002817996086"
-: [1] "The computation took 66.1090097427368 seconds"
+[[file:~/test_plot.png]]
