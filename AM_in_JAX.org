@@ -78,10 +78,10 @@ from AM_in_JAX import *
 
 This significantly slows the code on most GPUs.
 
-Without this however, the precision is not enough at higher dimensions.
++Without this however, the precision is not enough at higher dimensions.+
 
 #+begin_src python :session example :results none
-jax.config.update('jax_enable_x64', True)
+jax.config.update('jax_enable_x64', False)
 #+end_src
 
 With the new method of computing and updating the covariance matrix, this may no longer need to be used. 
@@ -536,11 +536,11 @@ if __name__ == "__main__":
     #test_AM_hstep()
     #test_thinned_step()
     
-    main(file ="Figures/adaptive_trace_JAX_d_10.png")
+    #main(file ="Figures/adaptive_trace_JAX_d_10.png")
     
     #or high dimensions
     
-    #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
+    main(d=10, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_dis10.png")
 
     # For computing the time graph
     
@@ -550,52 +550,5 @@ if __name__ == "__main__":
     #    for row in reader:
     #        matrix.append([float(item) for item in row])
     #sigma = jnp.array(matrix)
-    #compute_time_graph(sigma, "data/JAX_compute_times.csv")
+    #compute_time_graph(sigma, "data/JAX_compute_times-laptop-2.csv")
 #+end_src
-
-* Test Area
-
-#+begin_src python :session example :result output :tangle no
-d=2
-n=10000
-thinrate=10
-burnin=10000
-
-start_time = time.time()
-# the actual number of iterations is n*thin + burnin
-# computed_size = n*thinrate + burnin
-
-# keys for PRNG
-key = jax.random.PRNGKey(seed=1)
-keys = rand.split(key, n+burnin+1)
-
-# create a chaotic variance matrix to target
-M = rand.normal(keys[0], shape = (d,d))
-sigma = M.T @ M
-Q, R = qr(sigma) # take the QR decomposition of sigma
-
-# initial state before burn-in
-state0 = (1, jnp.zeros(d), jnp.zeros(d), ((0.1)**2)*jnp.identity(d)/d, False)
-
-# JAX's ~scan~ isn't quite ~iterate~, so this is a 'dummy'
-# function with an unused argument to call thinned_step for the
-# actually used samples
-# NOTE: this comment may be out of date now that I am scanning over the keys
-def step(carry, key):
-        nextstate = thinned_step(thinrate,carry, Q, R, key)
-        return(nextstate, nextstate)
-
-# inital state, after burnin
-# again, I should probably scan here
-start_state = jl.fori_loop(1, burnin+1, lambda i,x: adapt_step(x, Q, R, keys[i]), state0)
-
-# the sample
-am_sample = jl.scan(step, start_state, keys[burnin+1:])[1]
-
-# the tiume of the computation in seconds
-end_time = time.time()
-duration = time.time() - start_time
-#+end_src
-
-#+RESULTS:
-: None

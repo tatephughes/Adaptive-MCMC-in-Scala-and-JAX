@@ -10,7 +10,7 @@ import time
 from AM_in_JAX_tests import *
 import csv
 
-jax.config.update('jax_enable_x64', True)
+jax.config.update('jax_enable_x64', False)
 
 def try_accept(state, prop, alpha, key):
 
@@ -256,11 +256,11 @@ if __name__ == "__main__":
     #test_AM_hstep()
     #test_thinned_step()
     
-    main(file ="Figures/adaptive_trace_JAX_d_10.png")
+    #main(file ="Figures/adaptive_trace_JAX_d_10.png")
     
     #or high dimensions
     
-    #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_high_d.png")
+    main(d=10, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_dis10.png")
 
     # For computing the time graph
     
@@ -270,4 +270,4 @@ if __name__ == "__main__":
     #    for row in reader:
     #        matrix.append([float(item) for item in row])
     #sigma = jnp.array(matrix)
-    #compute_time_graph(sigma, "data/JAX_compute_times.csv")
+    #compute_time_graph(sigma, "data/JAX_compute_times-laptop-2.csv")

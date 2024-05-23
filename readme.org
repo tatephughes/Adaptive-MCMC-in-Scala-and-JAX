@@ -257,7 +257,7 @@ with open('data/chaotic_variance.csv', 'w', newline='') as csvfile:
 From here, both versions have a function ~compute_time_graph~ which outputs a csv file containing the time it took to compute over a million iterations for each submatrix of the intputted variance matrix, whcih will be provided from this file. This is then plotted as below using R.
 
 #+begin_src R :session example :results none
-library(ascii)
+#library(ascii)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
@@ -333,99 +333,7 @@ print(b_graph)
 
 We can see that while both perform equally as well, JAX maintains roughly double the performance of Scala across the board.
 
-** On the PC
-
-I also ran the complexity on the PC. These are the results
-
-#+begin_src R :session example :results none
-jax_times_pc <- cbind(1:100,read.csv("./data/JAX_compute_times-pc-1.csv", header = FALSE)) %>%
-  mutate(proc = "JAX")
-names(jax_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-scala_times_pc <- cbind(1:100,read.csv("./data/scala_compute_times-pc-1.csv", header = FALSE)) %>%
-  mutate(proc = "Scala")
-names(scala_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-#+end_src
-
-
-
-#+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_pc.png :width 1000 :exports both
-data <- rbind(jax_times_pc, scala_times_pc)
-print(ascii(head(data)), type = "org")
-
-time_graph_pc <- ggplot(data, aes(x = d, y = time, color = proc)) +
-  geom_line(size = 2) +
-  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
-  theme_minimal() + 
-  labs(title = "Compute Time against Dimension (Ryzen 7 5800X, 16Gb RAM, )",
-       x = "Dimension",
-       y = "Compute Time (seconds)") +
-  theme(text = element_text(size = 20))
-print(time_graph_pc)
-#+end_src
-
-#+RESULTS:
-[[file:./Figures/plot_complexity_pc.png]]
-
-This graph is much more easily explainable; Scala is smooth and very clearly quadratic (which makes sense), and JAX is mostly quadratic but with a bump around $d\approx60$, which is likely due to maxing out some cache size. From there the line gets a bit wobbly, and I'm not sure how to explain that.
-
-**** DONE Add specs to the titles                               :projects:
-
-** Repeats
-
-Given the odd shape of the original graph, I re-ran them three more times recently. A few things were different this time;
-  + I have recently re-installed my OS, meaning drivers, background processes etc. may be different
-  + Python is now running in a virtual environment
-  + the ~eig~ functions in the JAX ~effectiveness~ function are changed to ~eigh~ to take advantage of symmetry and to allow compatibility with a GPU
-
-None of these should, hypothetically, affect anything. Nevertheless, this is the graph I get;
-
-#+begin_src R :session example :results none
-jax_times_laptop_2 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_2.csv", header = FALSE)) %>%
-  mutate(proc = "JAX2")
-names(jax_times_laptop_2) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-jax_times_laptop_3 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_3.csv", header = FALSE)) %>%
-  mutate(proc = "JAX3")
-names(jax_times_laptop_3) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-jax_times_laptop_4 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_4.csv", header = FALSE)) %>%
-  mutate(proc = "JAX4")
-names(jax_times_laptop_4) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-scala_times_laptop_2 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_2.csv", header = FALSE)) %>%
-  mutate(proc = "Scala2")
-names(scala_times_laptop_2) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-scala_times_laptop_3 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_3.csv", header = FALSE)) %>%
-  mutate(proc = "Scala3")
-names(scala_times_laptop_3) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-scala_times_laptop_4 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_4.csv", header = FALSE)) %>%
-  mutate(proc = "Scala4")
-names(scala_times_laptop_4) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-#+end_src
-
-#+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_laptop_2.png :width 1000 :exports both
-data <- rbind(jax_times_laptop_2, jax_times_laptop_3, jax_times_laptop_4,
-              scala_times_laptop_2, scala_times_laptop_3, scala_times_laptop_4)
-
-time_graph_laptop_2 <- ggplot(data, aes(x = d, y = time, color = proc)) +
-  geom_line(size = 2) +
-  scale_color_manual(values = c("JAX1" = "coral", "JAX2" = "coral2",
-                                "JAX3" = "coral4", "JAX4" = "coral1",
-                                "Scala1" = "cadetblue", "Scala2" = "cadetblue2",
-                                "Scala3" = "cadetblue3", "Scala4" = "cadetblue4")) +
-  theme_minimal() + 
-  labs(title = "Compute Time against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
-       x = "Dimension",
-       y = "Compute Time (seconds)") +
-  theme(text = element_text(size = 20))
-print(time_graph_laptop_2)
-#+end_src
-
-#+RESULTS:
-[[file:./Figures/plot_complexity_laptop_2.png]]
-
-The JAX performance is significantly worse after the cache is filled, and consistently so! I have no idea what is causing this, it is the same code that was ran on the PC.
-
-
-
-* Newsest (MAY)
+* Newest (MAY)
 
 #+begin_src R :session example :results none
 jax_times_pc <- cbind(1:100,read.csv("./data/JAX_compute_times-pc-1.csv", header = FALSE)) %>%
@@ -458,3 +366,31 @@ print(time_graph_pc)
 
 #+RESULTS:
 [[file:./Figures/plot_complexity_pc.png]]
+
+
+#+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_laptop.png :width 1000
+jax_times_laptop <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_1.csv", header = FALSE)) %>%
+  mutate(proc = "JAX")
+names(jax_times_laptop) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+r_times_laptop <- cbind(1:50,read.csv("./data/R_compute_times_laptop_1.csv", header = FALSE)) %>%
+  mutate(proc = "R")
+names(r_times_laptop) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+scala_times_laptop <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1.csv", header = FALSE)) %>%
+  mutate(proc = "Scala")
+names(scala_times_laptop) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+
+data <- rbind(jax_times_laptop, r_times_laptop, scala_times_laptop)
+
+time_graph_pc <- ggplot(data, aes(x = d, y = time, color = proc)) +
+  geom_line(size = 2) +
+  scale_color_manual(values = c("JAX" = "red", "R" = "darkgreen", "Scala" = "blue")) +
+  theme_minimal() + 
+  labs(title = "Compute Time against Dimension (Ryzen 7 5800X, 16Gb RAM, )",
+       x = "Dimension",
+       y = "Compute Time (seconds)") +
+  theme(text = element_text(size = 20))
+print(time_graph_pc)
+#+end_src
+
+#+RESULTS:
+[[file:./Figures/plot_complexity_laptop.png]]

@@ -108,7 +108,7 @@ run_with_complexity <- function(sigma_d){
 
   state <- list(j = 1, x = rep(0,d), x_mean = rep(0,d), prop_cov = (0.1)^2*diag(d)/d)
   
-  sample <- rep(0,n)
+  sample <- vector("list", n)
 
   start_time = Sys.time()
   
@@ -146,7 +146,7 @@ compute_time_graph <- function(sigma, d){
     
   }
 
-  write.table(y, "./data/R_compute_times.csv", sep = ",", col.names = FALSE, row.names = FALSE)
+  write.table(y, "./data/R_compute_times_laptop_1.csv", sep = ",", col.names = FALSE, row.names = FALSE)
 
 }
 
@@ -192,7 +192,7 @@ main <- function(d=10,n=100000, thinrate=10, burnin=10000, filepath){
   return(sample)
 }
 
-main(d=10,n=100000, thinrate=10, burnin=10000, filepath = "./Figures/adaptive_trace_r_d_10.png")
+#main(d=10,n=100000, thinrate=10, burnin=10000, filepath = "./Figures/adaptive_trace_r_d_10.png")
 
 sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
-#compute_time_graph(sigma, 30)
+compute_time_graph(sigma, 50)

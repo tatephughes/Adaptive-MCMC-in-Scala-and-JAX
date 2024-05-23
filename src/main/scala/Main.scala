@@ -188,7 +188,7 @@ object AdaptiveMetropolis:
 
   }
     
-  def run(): Unit =
+  @main def run(): Unit =
 
     // Read the file lines, skipping empty lines
     val lines = Source.fromFile("data/chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
@@ -203,9 +203,9 @@ object AdaptiveMetropolis:
     // Creating the DenseMatrix
     val sigma_d = DenseMatrix(data: _*).reshape(numRows, numCols)
 
-    compute_time_graph(sigma_d, "data/scala_compute_times.csv")
+    compute_time_graph(sigma_d, "data/scala_compute_times_laptop_1.csv")
 
-  @main def simple_run(): Unit = 
+  def simple_run(): Unit = 
 
     val d: Int = 10
     val n: Int = 100000        // size of the desired sample
