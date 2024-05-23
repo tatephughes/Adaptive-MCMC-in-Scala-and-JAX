@@ -100,8 +100,11 @@ As a baseline, I have also included an R version. At the root of this project, t
 
 #+begin_quote
 The true variance of x_1 is 14.1301614453525
+
 The empirical sigma value is 14.1117375348109
+
 The b value is 1.00003160696836
+
 The computation took 72.3016312122345 seconds
 #+end_quote
 
