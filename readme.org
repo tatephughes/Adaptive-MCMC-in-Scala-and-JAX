@@ -239,10 +239,10 @@ print(head(jax_times_laptop_1,3))
 #+end_src
 
 #+RESULTS:
-: d     n thinrate burnin     time        b proc
-: 1 1 10000       10  1e+06 1.001339 1.000000  JAX
-: 2 2 10000       10  1e+06 1.194311 1.000005  JAX
-: 3 3 10000       10  1e+06 1.301795 1.000235  JAX
+: d     n thinrate burnin      time        b proc
+: 1 1 10000       10  1e+06 0.9886949 1.000000  JAX
+: 2 2 10000       10  1e+06 1.1216428 1.000010  JAX
+: 3 3 10000       10  1e+06 1.3367074 1.000016  JAX
 
 #+begin_src R :session example :results output
 scala_times_laptop_1 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1.csv", header = FALSE)) %>%
@@ -290,8 +290,6 @@ print(time_graph)
 
 #+RESULTS:
 [[file:Figures/plot_complexity_laptop_1.png]]
-
-(note that the results for JAX are out-of-date, the computations were done with 64-bit precision, which is no longer necessary and significantly slows the program down at around 60 dimensions)
 
 We can also plot the final sub-optimality factor, $b$, over all the dimensions;
 

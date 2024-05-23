@@ -237,11 +237,14 @@ def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace
     duration = time.time()-start_time
     
     # the empirical covariance of the sample
-    sigma_j = cov(am_sample[1])
-    b = effectiveness(sigma,sigma_j)
+    #sigma_j = cov(am_sample[1])
+    C_j = am_sample[3][-1]# / (5.6644/d)
+    b = effectiveness(sigma,C_j)
 
-    print(f"The true variance of x_1 is {sigma[0,0]}")
-    print(f"The empirical sigma value is {sigma_j[0,0]}")
+    #print(f"The true variance of x_1 is {sigma[0,0]}")
+    #print(f"The empirical sigma value is {C_j[0,0]}")
+    print(f"The optimal sampling value is {sigma[0,0] * (5.6644/d)}")
+    print(f"The actual sampling value is {C_j[0,0]}")
     print(f"The b value is {b}")
     print(f"The computation took {duration} seconds")
 
@@ -260,14 +263,14 @@ if __name__ == "__main__":
     
     #or high dimensions
     
-    main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_d_100.png")
+    #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_d_100.png")
 
     # For computing the time graph
     
-    #matrix = []
-    #with open('./data/chaotic_variance.csv', 'r', newline='') as file:
-    #    reader = csv.reader(file)
-    #    for row in reader:
-    #        matrix.append([float(item) for item in row])
-    #sigma = jnp.array(matrix)
-    #compute_time_graph(sigma, "data/JAX_compute_times-laptop-2.csv")
+    matrix = []
+    with open('./data/chaotic_variance.csv', 'r', newline='') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            matrix.append([float(item) for item in row])
+    sigma = jnp.array(matrix)
+    compute_time_graph(sigma, "data/JAX_compute_times-laptop-2.csv")
