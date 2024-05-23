@@ -92,26 +92,38 @@ In the file ~AM_in_JAX.org~, there is the source code as well as documentation f
 
 * Results
 
-In both implementations, we run with ~d=10~, ~n=100000~, ~burnin=100000~ and ~thinrate=10~.
+In all implementations, we run with ~d=10~, ~n=100000~, ~burnin=100000~ and ~thinrate=10~.
+
+** R
+
+As a baseline, I have also included an R version. At the root of this project, there is an R script that can be ran. The results are as follows
+
+#+begin_quote
+The true variance of x_1 is 14.1301614453525
+The empirical sigma value is 14.1117375348109
+The b value is 1.00003160696836
+The computation took 72.3016312122345 seconds
+#+end_quote
+
+#+ATTR_ORG: :height 100
+[[file:./Figures/adaptive_trace_r_d_10.png]]
 
 ** Scala
 
 The Scala output can be found using the command ~sbt run~ in this project's root;
 
 #+begin_quote
-The true variance of x_1 is 4.0203388245821
+The true variance of x_1 is 11.731161806946728
 
-The Empirical sigma value is 4.041380732669074
+The empirical sigma value is 11.803664855741761
 
-The b value is 1.0000233300468546
+The b value is 1.0000659032541865
 
-The computation took 9.178699105 seconds
+The computation took 8.548220083 seconds
 #+end_quote
 
-- note: it seems to take longer now, about 12 seconds
-
 #+ATTR_ORG: :height 100
-[[file:./Figures/adaptive_trace_scala.png]]
+[[file:./Figures/adaptive_trace_scala_d_10.png]]
 
 (note that I can't get rid of the transparency in Breeze-viz, so you may have to turn off dark mode to see this properly)
 
@@ -120,105 +132,57 @@ The computation took 9.178699105 seconds
 The JAX output can be found by running ~python AM_in_JAX.py~ in this project's root;
 
 #+begin_quote
-The true variance of x_1 is 9.967914581298828
+The true variance of x_1 is 8.333649635314941
 
-The empirical sigma value is 9.99879264831543
+The empirical sigma value is 8.369915962219238
 
-The b value is 1.0000910758972168
+The b value is 1.0001994371414185
 
-The computation took 3.7597200870513916 seconds
+The computation took 3.0340700149536133 seconds
 #+end_quote
 
-Obviously, the numbers are different since the target variance is different, but this ran over twice as fast
+Obviously, the numbers are different since the target variance is different (this will be addressed shortly), but this ran nearly three times as fast! R performs relatively very slowly.
 
 #+ATTR_ORG: :height 100
-[[file:./Figures/adaptive_trace_JAX.png]]
+[[file:./Figures/adaptive_trace_JAX_d_10.png]]
 
-*** update
-
-For high dimensions, I had to increase the size of the data types to 64 bit; this drastically impacted computing time for JAX
-
-#+begin_quote
-The true variance of x_1 is 6.589626408404064
-
-The empirical sigma value is 6.551140424596137
-
-The b value is 1.0000435338955926
-
-The computation took 7.1804351806640625 seconds
-#+end_quote
-
-now, the benefits over scala are more minor!
 
 ** Very high dimensions
 
-The paper, in it's examples, get results for ~d=100~. In Scala, using thinning and burn-in, the garbage collector does a good job and we can get high enough iteration counts the the program does very well.
+The paper, in it's examples, get results for ~d=100~.
+
+In Scala, using thinning and burn-in, the garbage collector does a good job and we can get high enough iteration counts the the program does very well.
 
 For ~d=100~, ~n=10000~, ~burnin=1000000~, and ~thinrate=100~, I get 
 
 #+begin_quote
-The true variance of x_1 is 87.24837703682367
+The true variance of x_1 is 65.0853505983081
 
-The empirical sigma value is 86.13431051648674
+The empirical sigma value is 66.58915290787915
 
-The b value is 1.0003412161513419
+The b value is 1.0034403980298399
 
-The computation took 14962.10357885 seconds
+The computation took 1398.362186623
 #+end_quote
 
-[[file:./Figures/adaptive_trace_scala_high_d.png]]
+[[file:./Figures/adaptive_trace_scala_d_100.png]]
 
 and in JAX we again get roughly twice the speed (oops that was with about 10 times fewer iterations)
 
 #+begin_quote
-The true variance of x_1 is 109.05463889081547
+The true variance of x_1 is 98.31156921386719
 
-The empirical sigma value is 111.75204879394798
+The empirical sigma value is 96.6253662109375
 
-The b value is 1.0036710382794376
+The b value is 1.0056523084640503
 
-The computation took 786.4629402160645 seconds
+The computation took 90.36556029319763 seconds
 #+end_quote
 
 #+ATTR_ORG: :height 100
-[[file:./Figures/adaptive_trace_jax_high_d.png]]
+[[file:./Figures/adaptive_trace_JAX_d_100.png]]
 
 (this isn't currently the correct graph, I accidentally wrote over it, I will re-run soon)
-
-* Benchmarks on a more powerful system
-
-On my personal PC with a Ryzen 7 5800X and an RTX 3060ti (notably a gaming card, not particularly suitable for this purpose) I get the following results
-
-** Scala
-
-#+begin_quote
-The true variance of x_1 is 11.731161806946728
-The empirical sigma value is 11.856237624615899
-The b value is 1.00016514597069
-The computation took 11.173750967 seconds
-#+end_quote
-
-** JAX (CPU)
-
-#+begin_quote
-The true variance of x_1 is 7.858357375214536
-The empirical sigma value is 8.02485487422553
-The b value is 1.0004841316639048
-The computation took 1.9246833324432373 seconds
-#+end_quote
-
-** JAX (GPU)
-
-One of the biggest reasons to use JAX is its NVIDIA GPU support. Running the same $d=10$ test again, 
-
-#+begin_quote
-The true variance of x_1 is 7.858357375214536
-The empirical sigma value is 8.02485487422554
-The b value is 1.0004841316639033
-The computation took 30.754671812057495 seconds
-#+end_quote
-
-so something is very wrong!
 
 * Complexity vs time
 
@@ -266,43 +230,53 @@ library(patchwork)
 
 #+begin_src R :session example :results output
 jax_times_laptop_1 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_1.csv", header = FALSE)) %>%
-  mutate(proc = "JAX1")
+  mutate(proc = "JAX")
 names(jax_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-print(ascii(head(jax_times_laptop_1,3)), type="org")
+print(head(jax_times_laptop_1,3))
 #+end_src
 
 #+RESULTS:
-: |   | d    | n        | thinrate | burnin     | time | b    | proc |
-: |---+------+----------+----------+------------+------+------+------|
-: | 1 | 1.00 | 10000.00 | 10.00    | 1000000.00 | 1.26 | 1.00 | JAX1 |
-: | 2 | 2.00 | 10000.00 | 10.00    | 1000000.00 | 1.66 | 1.00 | JAX1 |
-: | 3 | 3.00 | 10000.00 | 10.00    | 1000000.00 | 2.20 | 1.00 | JAX1 |
+: d     n thinrate burnin     time        b proc
+: 1 1 10000       10  1e+06 1.001339 1.000000  JAX
+: 2 2 10000       10  1e+06 1.194311 1.000005  JAX
+: 3 3 10000       10  1e+06 1.301795 1.000235  JAX
 
 #+begin_src R :session example :results output
 scala_times_laptop_1 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1.csv", header = FALSE)) %>%
-  mutate(proc = "Scala1")
+  mutate(proc = "Scala")
 names(scala_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-print(ascii(head(scala_times_laptop_1,3)), type="org")
+print(head(scala_times_laptop_1,3))
 #+end_src
 
 #+RESULTS:
-: |   | d    | n        | thinrate | burnin     | time | b    | proc   |
-: |---+------+----------+----------+------------+------+------+--------|
-: | 1 | 1.00 | 10000.00 | 10.00    | 1000000.00 | 3.42 | 1.00 | Scala1 |
-: | 2 | 2.00 | 10000.00 | 10.00    | 1000000.00 | 3.52 | 1.00 | Scala1 |
-: | 3 | 3.00 | 10000.00 | 10.00    | 1000000.00 | 3.84 | 1.00 | Scala1 |
+: d     n thinrate  burnin     time        b  proc
+: 1 1 10000       10 1000000 2.475539 1.000000 Scala
+: 2 2 10000       10 1000000 2.623258 1.000080 Scala
+: 3 3 10000       10 1000000 2.978401 1.000217 Scala
+
+#+begin_src R :session example :results output
+r_times_laptop_1 <- cbind(1:50,read.csv("./data/R_compute_times_laptop_1.csv", header = FALSE)) %>%
+  mutate(proc = "R")
+names(r_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+print(head(r_times_laptop_1, 3))
+#+end_src
+
+#+RESULTS:
+: d     n thinrate burnin     time        b proc
+: 1 1 10000       10  1e+06 45.66058 1.000000    R
+: 2 2 10000       10  1e+06 54.36749 1.000026    R
+: 3 3 10000       10  1e+06 56.14915 1.000044    R
 
 We can now use ~ggplot~ to make a nice plot of this data.
 
 Putting the data together and plotting
 
 #+begin_src R :session example :results graphics file :file Figures/plot_complexity_laptop_1.png :width 1000 :exports both
-data <- rbind(jax_times_laptop_1, scala_times_laptop_1)
-print(ascii(head(data)), type = "org")
+data <- rbind(jax_times_laptop_1, scala_times_laptop_1, r_times_laptop_1)
 
 time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
-  scale_color_manual(values = c("JAX1" = "red", "Scala1" = "blue")) +
+  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue", "R" = "darkgreen")) +
   theme_minimal() + 
   labs(title = "Compute Time against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
        x = "Dimension",
@@ -314,12 +288,14 @@ print(time_graph)
 #+RESULTS:
 [[file:Figures/plot_complexity_laptop_1.png]]
 
-We can also plot the effectiveness value, $b$;
+(note that the results for JAX are out-of-date, the computations were done with 64-bit precision, which is no longer necessary and significantly slows the program down at around 60 dimensions)
+
+We can also plot the final sub-optimality factor, $b$, over all the dimensions;
 
 #+begin_src R :session example :results graphics file :file Figures/plot_b_laptop.png :width 1000 :exports both
 b_graph <- ggplot(data, aes(x = d, y = b, color = proc)) +
   geom_line(size = 2) +
-  scale_color_manual(values = c("JAX1" = "red", "Scala1" = "blue")) +
+  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue", "R" = "darkgreen")) +
   theme_minimal() + 
   labs(title = "Effectiveness against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
        x = "Dimension",
@@ -331,66 +307,4 @@ print(b_graph)
 #+RESULTS:
 [[file:Figures/plot_b_laptop.png]]
 
-We can see that while both perform equally as well, JAX maintains roughly double the performance of Scala across the board.
-
-* Newest (MAY)
-
-#+begin_src R :session example :results none
-jax_times_pc <- cbind(1:100,read.csv("./data/JAX_compute_times-pc-1.csv", header = FALSE)) %>%
-  mutate(proc = "JAX")
-names(jax_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-scala_times_pc <- cbind(1:100,read.csv("./data/scala_compute_times-pc-1.csv", header = FALSE)) %>%
-  mutate(proc = "Scala")
-names(scala_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-R_times_pc <- cbind(1:30,read.csv("./data/R_compute_times-pc-1.csv", header = FALSE)) %>%
-  mutate(proc = "R")
-names(R_times_pc) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-#+end_src
-
-
-
-#+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_pc.png :width 1000 :exports both
-data <- rbind(jax_times_pc, scala_times_pc)
-print(ascii(head(data)), type = "org")
-
-time_graph_pc <- ggplot(data, aes(x = d, y = time, color = proc)) +
-  geom_line(size = 2) +
-  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue")) +
-  theme_minimal() + 
-  labs(title = "Compute Time against Dimension (Ryzen 7 5800X, 16Gb RAM, )",
-       x = "Dimension",
-       y = "Compute Time (seconds)") +
-  theme(text = element_text(size = 20))
-print(time_graph_pc)
-#+end_src
-
-#+RESULTS:
-[[file:./Figures/plot_complexity_pc.png]]
-
-
-#+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_laptop.png :width 1000
-jax_times_laptop <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_1.csv", header = FALSE)) %>%
-  mutate(proc = "JAX")
-names(jax_times_laptop) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-r_times_laptop <- cbind(1:50,read.csv("./data/R_compute_times_laptop_1.csv", header = FALSE)) %>%
-  mutate(proc = "R")
-names(r_times_laptop) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-scala_times_laptop <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1.csv", header = FALSE)) %>%
-  mutate(proc = "Scala")
-names(scala_times_laptop) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-
-data <- rbind(jax_times_laptop, r_times_laptop, scala_times_laptop)
-
-time_graph_pc <- ggplot(data, aes(x = d, y = time, color = proc)) +
-  geom_line(size = 2) +
-  scale_color_manual(values = c("JAX" = "red", "R" = "darkgreen", "Scala" = "blue")) +
-  theme_minimal() + 
-  labs(title = "Compute Time against Dimension (Ryzen 7 5800X, 16Gb RAM, )",
-       x = "Dimension",
-       y = "Compute Time (seconds)") +
-  theme(text = element_text(size = 20))
-print(time_graph_pc)
-#+end_src
-
-#+RESULTS:
-[[file:./Figures/plot_complexity_laptop.png]]
+We can see that while both perform equally as well, JAX maintains a good lead in terms of speed over both Scala and especially R.

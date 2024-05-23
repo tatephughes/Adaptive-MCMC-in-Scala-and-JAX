@@ -189,10 +189,10 @@ main <- function(d=10,n=100000, thinrate=10, burnin=10000, filepath){
 
   plotter(sample, filepath, 1)
   
-  return(sample)
+  #return(sample)
 }
 
-#main(d=10,n=100000, thinrate=10, burnin=10000, filepath = "./Figures/adaptive_trace_r_d_10.png")
+main(d=10,n=100000, thinrate=10, burnin=100000, filepath = "./Figures/adaptive_trace_r_d_10.png")
 
-sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
-compute_time_graph(sigma, 50)
+#sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
+#compute_time_graph(sigma, 50)

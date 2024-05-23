@@ -298,42 +298,13 @@ main <- function(d=10,n=100000, thinrate=10, burnin=10000, filepath){
 
   plotter(sample, filepath, 1)
   
-  return(sample)
+  #return(sample)
 }
 #+end_src
 
-* Test Area
-
 #+begin_src R :session example :results output :tangle AM_in_R.Rscript
-#main(d=10,n=100000, thinrate=10, burnin=10000, filepath = "./Figures/adaptive_trace_r_d_10.png")
+main(d=10,n=100000, thinrate=10, burnin=100000, filepath = "./Figures/adaptive_trace_r_d_10.png")
 
-sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
-compute_time_graph(sigma, 50)
+#sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
+#compute_time_graph(sigma, 50)
 #+end_src
-
-#+RESULTS:
-
-
-#+begin_src R :session example :results graphics file :file ~/test_plot.png :height 600 :width 1400 :exports both :tangle none
-
-# The format of ~sample~ is actually kind of awkward, so we manually extract the relevant list of first coordinates
-
-#n <- 100000
-#d <- 1
-#
-#y <- sapply(sample, function(i){i$x[d]})
-#
-#df <- data.frame(index = seq_along(y), value = y)
-#
-#trace_plot <- ggplot(df, aes(x = index, y = value)) +
-#  geom_line(col = "#00ABFD") +
-#  ylab("First Coordinate Value") +
-#  xlab("Step") +
-#  labs(title = "Trace plot of the first coordinate in R")
-#
-#ggsave("my_plot.png", plot = p, width = 6, height = 4, dpi = 300)
-
-#+end_src
-
-#+RESULTS:
-[[file:~/test_plot.png]]

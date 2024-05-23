@@ -48,7 +48,7 @@ import jax
 import jax.numpy as jnp
 import jax.lax as jl
 import jax.random as rand
-from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky
+from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
 import time
 from AM_in_JAX_tests import *
 import csv
@@ -136,7 +136,7 @@ def try_accept(state, prop, alpha, key):
                          j,
                          lambda t: prop_cov,
                          j,
-                         lambda t: prop_cov*(t-1)/t + (t*jnp.outer(x_mean,x_mean) - (t+1)*jnp.outer(x_mean_new,x_mean_new) + jnp.outer(x_new,x_new) + 0.01*jnp.identity(d))*5.6644/(t*d))
+                         lambda t: prop_cov*((t-1)/t) + (t*jnp.outer(x_mean,x_mean) - (t+1)*jnp.outer(x_mean_new,x_mean_new) + jnp.outer(x_new,x_new) + 0.01*jnp.identity(d))*5.6644/(t*d))
   
   # NOTE: seems inefficient to construct a diagonal identity matrix like this, I would imagine there is a better way to do this
   
@@ -540,7 +540,7 @@ if __name__ == "__main__":
     
     #or high dimensions
     
-    main(d=10, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_dis10.png")
+    main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_d_100.png")
 
     # For computing the time graph
     
