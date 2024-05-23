@@ -170,7 +170,7 @@ The computation took 1398.362186623
 
 [[file:./Figures/adaptive_trace_scala_d_100.png]]
 
-and in JAX we again get roughly twice the speed (oops that was with about 10 times fewer iterations)
+and in JAX we get an even more significant speed boost;
 
 #+begin_quote
 The true variance of x_1 is 98.31156921386719
