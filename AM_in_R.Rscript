@@ -1,5 +1,6 @@
 library(MASS)
 library(ggplot2)
+library(mvnfast)
 
 try_accept <- function(state, prop, alpha){
 
@@ -26,7 +27,7 @@ try_accept <- function(state, prop, alpha){
   if (j <= 2*d){
     prop_cov_new <- prop_cov
   } else {
-    prop_cov_new <- prop_cov*(j-1)/j + (j*(x_mean%*%t(x_mean)) - (j+1)*(x_mean_new%*%t(x_mean_new)) + (x_new%*%t(x_new)) + 0.01*diag(d))*5.6644/(j*d)
+    prop_cov_new <- prop_cov*(j-1)/j + (j*tcrossprod(x_mean, x_mean) - (j+1)*tcrossprod(x_mean_new, x_mean_new) + tcrossprod(x_new, x_new) + 0.01*diag(d))*5.6644/(j*d)
   }
     
   return(list(j = j + 1,
@@ -44,11 +45,11 @@ adapt_step <- function(state, q, r){
     prop_cov = state$prop_cov
     d        = length(x)
     
-    prop = mvrnorm(1, x, prop_cov)
+    prop = rmvn(1, x, prop_cov)[1,]
 
     # Compute the log acceptance probability
-    alpha = 0.5 * (t(x) %*% (solve(r, t(q) %*% x))
-                   - (t(prop) %*% solve(r, t(q) %*% prop)))
+    alpha = 0.5 * (crossprod(x, solve(r, crossprod(q, x)))
+                 - crossprod(prop, solve(r, crossprod(q, prop))))
     
     return(try_accept(state, prop, alpha))
 }
