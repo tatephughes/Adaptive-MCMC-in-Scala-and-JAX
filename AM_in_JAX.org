@@ -344,15 +344,15 @@ b = d\frac{\sum \lambda_i^{-2}}{(\sum \lambda_i^{-1})^2 },
 \end{aligned}$$
 where $\lamba_{i}$ are the eigenvalues of $\mat C_i^{1/2}\mat\Sigma^{-1/2}$ Currently , this is only used on the sample covariance of the generated chain, which is not how it is mean to be used. It is meant to be applied to the sampling covariance within the chain. It is also inefficient currently, and could be improved using a change of coordinate to use ~eigh~ instead of ~eig~, which would also allow it to work on GPU.
 
-*************** TODO Fix the eigenvalue computation with a change of coordinate :project:
-*************** TODO Compute b on the sampling covariance, not the sample covariance :project:
+*************** TODO Fix the eigenvalue computation with a change of coordinate :projects:
+*************** TODO Compute b on the sampling covariance, not the sample covariance :projects:
 *************** END
 
 
 #+begin_src python :session example :results none
 def effectiveness(sigma, sigma_j):
 
-    """Computes the sub-optimality factor between the true target covarinance ~sigma~ and the sampling covariance ~sigma_j~, from Roberts and Rosethal
+    """Computes the sub-optimality factor between the true target covariance ~sigma~ and the sampling covariance ~sigma_j~, from Roberts and Rosethal
     """
 
     d = sigma.shape[0]
@@ -380,7 +380,8 @@ Plots the trace of the first coordinate of the given sample, and saves it to a f
 #+begin_src python :session example :results none
 def plotter(sample, file_path, d):
 
-    """Plots a trace plot of the dth coordinate of the given array of states, and saves the figure to ~file_path~"""
+    """Plots a trace plot of the dth coordinate of the given array of states,
+    and saves the figure to ~file_path~"""
     
     first = sample[:,0]
     plt.figure(figsize=(590/96,370/96))
@@ -543,15 +544,15 @@ if __name__ == "__main__":
     
     #or high dimensions
     
-    #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_d_100.png")
+    main(d=200, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_d_200.png")
 
     # For computing the time graph
     
-    matrix = []
-    with open('./data/chaotic_variance.csv', 'r', newline='') as file:
-        reader = csv.reader(file)
-        for row in reader:
-            matrix.append([float(item) for item in row])
-    sigma = jnp.array(matrix)
-    compute_time_graph(sigma, "data/JAX_compute_times-laptop-2.csv")
+    #matrix = []
+    #with open('./data/chaotic_variance.csv', 'r', newline='') as file:
+    #    reader = csv.reader(file)
+    #    for row in reader:
+    #        matrix.append([float(item) for item in row])
+    #sigma = jnp.array(matrix)
+    #compute_time_graph(sigma, "data/JAX_compute_times-laptop-2.csv")
 #+end_src

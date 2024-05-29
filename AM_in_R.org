@@ -38,6 +38,7 @@ The code here is not fully commented, but since it is almost identical to the JA
 #+begin_src R :session example :results none :tangle AM_in_R.Rscript
 library(MASS)
 library(ggplot2)
+library(mvnfast)
 #+end_src
 
 * Core Functions
@@ -78,7 +79,7 @@ try_accept <- function(state, prop, alpha){
   if (j <= 2*d){
     prop_cov_new <- prop_cov
   } else {
-    prop_cov_new <- prop_cov*(j-1)/j + (j*(x_mean%*%t(x_mean)) - (j+1)*(x_mean_new%*%t(x_mean_new)) + (x_new%*%t(x_new)) + 0.01*diag(d))*5.6644/(j*d)
+    prop_cov_new <- prop_cov*(j-1)/j + (j*tcrossprod(x_mean, x_mean) - (j+1)*tcrossprod(x_mean_new, x_mean_new) + tcrossprod(x_new, x_new) + 0.01*diag(d))*5.6644/(j*d)
   }
     
   return(list(j = j + 1,
@@ -113,7 +114,7 @@ adapt_step <- function(state, q, r){
     prop_cov = state$prop_cov
     d        = length(x)
     
-    prop = mvrnorm(1, x, prop_cov)
+    prop = rmvn(1, x, prop_cov)[1,]
 
     # Compute the log acceptance probability
     alpha = 0.5 * (t(x) %*% (solve(r, t(q) %*% x))
@@ -251,7 +252,7 @@ compute_time_graph <- function(sigma, d){
     
   }
 
-  write.table(y, "./data/R_compute_times_laptop_1.csv", sep = ",", col.names = FALSE, row.names = FALSE)
+  write.table(y, "./data/R_compute_times_laptop_2.csv", sep = ",", col.names = FALSE, row.names = FALSE)
 
 }
 #+end_src
@@ -306,5 +307,5 @@ main <- function(d=10,n=100000, thinrate=10, burnin=10000, filepath){
 main(d=10,n=100000, thinrate=10, burnin=100000, filepath = "./Figures/adaptive_trace_r_d_10.png")
 
 #sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
-#compute_time_graph(sigma, 50)
+#compute_time_graph(sigma, 100)
 #+end_src

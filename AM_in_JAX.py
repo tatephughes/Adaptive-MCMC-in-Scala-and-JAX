@@ -263,14 +263,14 @@ if __name__ == "__main__":
     
     #or high dimensions
     
-    #main(d=100, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_d_100.png")
+    main(d=200, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_d_200.png")
 
     # For computing the time graph
     
-    matrix = []
-    with open('./data/chaotic_variance.csv', 'r', newline='') as file:
-        reader = csv.reader(file)
-        for row in reader:
-            matrix.append([float(item) for item in row])
-    sigma = jnp.array(matrix)
-    compute_time_graph(sigma, "data/JAX_compute_times-laptop-2.csv")
+    #matrix = []
+    #with open('./data/chaotic_variance.csv', 'r', newline='') as file:
+    #    reader = csv.reader(file)
+    #    for row in reader:
+    #        matrix.append([float(item) for item in row])
+    #sigma = jnp.array(matrix)
+    #compute_time_graph(sigma, "data/JAX_compute_times-laptop-2.csv")
