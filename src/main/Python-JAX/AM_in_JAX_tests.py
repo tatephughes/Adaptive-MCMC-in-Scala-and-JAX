@@ -84,7 +84,7 @@ def test_adapt_step():
         nextstate = adapt_step(carry, Q, R, keys[carry[0]])[0]
         return(nextstate, nextstate)
     
-    assert norm(cov(jl.scan(step, state, jnp.zeros(n))[1][1]) - sigma) < 0.2, "adap_stepr not producing sample sufficiently close to the target distribution"
+    assert norm(cov(jl.scan(step, state, jnp.zeros(n))[1][1]) - sigma) < 0.2, "adap_step not producing sample sufficiently close to the target distribution"
 
     
     return True

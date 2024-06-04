@@ -232,17 +232,20 @@ library(patchwork)
 #+end_src
 
 #+begin_src R :session example :results output
-jax_times_laptop_1 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_1.csv", header = FALSE)) %>%
-  mutate(proc = "JAX")
-names(jax_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+jax_times_laptop_32 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_1.csv", header = FALSE)) %>%
+  mutate(proc = "JAX32")
+names(jax_times_laptop_32) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+jax_times_laptop_64 <- cbind(1:100,read.csv("./data/JAX_64bit_compute_times_laptop_1.csv", header = FALSE)) %>%
+  mutate(proc = "JAX64")
+names(jax_times_laptop_64) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
 print(head(jax_times_laptop_1,3))
 #+end_src
 
 #+RESULTS:
-: d     n thinrate burnin      time        b proc
-: 1 1 10000       10  1e+06 0.9886949 1.000000  JAX
-: 2 2 10000       10  1e+06 1.1216428 1.000010  JAX
-: 3 3 10000       10  1e+06 1.3367074 1.000016  JAX
+: d     n thinrate burnin      time        b  proc
+: 1 1 10000       10  1e+06 0.9886949 1.000000 JAX32
+: 2 2 10000       10  1e+06 1.1216428 1.000010 JAX32
+: 3 3 10000       10  1e+06 1.3367074 1.000016 JAX32
 
 #+begin_src R :session example :results output
 scala_times_laptop_1 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1.csv", header = FALSE)) %>%
@@ -258,7 +261,7 @@ print(head(scala_times_laptop_1,3))
 : 3 3 10000       10 1000000 2.978401 1.000217 Scala
 
 #+begin_src R :session example :results output
-r_times_laptop_1 <- cbind(1:50,read.csv("./data/R_compute_times_laptop_1.csv", header = FALSE)) %>%
+r_times_laptop_1 <- cbind(1:80,read.csv("./data/R_compute_times_v2_laptop_1.csv", header = FALSE)) %>%
   mutate(proc = "R")
 names(r_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
 print(head(r_times_laptop_1, 3))
@@ -266,20 +269,20 @@ print(head(r_times_laptop_1, 3))
 
 #+RESULTS:
 : d     n thinrate burnin     time        b proc
-: 1 1 10000       10  1e+06 45.66058 1.000000    R
-: 2 2 10000       10  1e+06 54.36749 1.000026    R
-: 3 3 10000       10  1e+06 56.14915 1.000044    R
+: 1 1 10000       10  1e+06 25.70118 1.000000    R
+: 2 2 10000       10  1e+06 32.07974 1.000023    R
+: 3 3 10000       10  1e+06 34.13313 1.000122    R
 
 We can now use ~ggplot~ to make a nice plot of this data.
 
 Putting the data together and plotting
 
 #+begin_src R :session example :results graphics file :file Figures/plot_complexity_laptop_1.png :width 1000 :exports both
-data <- rbind(jax_times_laptop_1, scala_times_laptop_1, r_times_laptop_1)
+data <- rbind(jax_times_laptop_32, jax_times_laptop_64, scala_times_laptop_1, r_times_laptop_1)
 
 time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
-  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue", "R" = "darkgreen")) +
+  scale_color_manual(values = c("JAX32" = "red", "JAX64" = "pink", "Scala" = "blue", "R" = "darkgreen")) +
   theme_minimal() + 
   labs(title = "Compute Time against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
        x = "Dimension",

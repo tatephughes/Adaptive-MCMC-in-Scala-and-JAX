@@ -252,7 +252,7 @@ compute_time_graph <- function(sigma, d){
     
   }
 
-  write.table(y, "./data/R_compute_times_laptop_2.csv", sep = ",", col.names = FALSE, row.names = FALSE)
+  write.table(y, "./data/R_compute_times_v2_laptop_1.csv", sep = ",", col.names = FALSE, row.names = FALSE)
 
 }
 #+end_src
@@ -304,8 +304,8 @@ main <- function(d=10,n=100000, thinrate=10, burnin=10000, filepath){
 #+end_src
 
 #+begin_src R :session example :results output :tangle AM_in_R.Rscript
-main(d=10,n=100000, thinrate=10, burnin=100000, filepath = "./Figures/adaptive_trace_r_d_10.png")
+#main(d=10,n=100000, thinrate=10, burnin=100000, filepath = "./Figures/adaptive_trace_r_d_10.png")
 
-#sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
-#compute_time_graph(sigma, 100)
+sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))
+compute_time_graph(sigma, 80)
 #+end_src
