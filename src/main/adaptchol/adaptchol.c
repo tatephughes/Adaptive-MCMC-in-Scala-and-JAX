@@ -16,7 +16,7 @@
  
  Save as "adaptchol.c".
  
- Compile with "gcc -lm adaptchol.c -o adaptchol", then run with "./adaptchol".
+ Compile with "gcc adaptchol.c -o adaptchol -lm", then run with "./adaptchol".
  
  Upon completion, can run 'source("adaptx")' in R to see a trace plot
  of the first coordinate.  Also, can run '<<adaptmath' in Mathematica to
