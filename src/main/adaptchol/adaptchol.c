@@ -7,6 +7,8 @@
  
  Copyright (c) 2004, 2006 by Gareth O. Roberts and Jeffrey S. Rosenthal
  
+ 2024: Minimal fixes to get working and satisfy standards compliance by Louis Aslett
+ 
  Licensed for general copying, distribution and modification according to
  the GNU General Public License (http://www.gnu.org/copyleft/gpl.html).
  
@@ -14,7 +16,7 @@
  
  Save as "adaptchol.c".
  
- Compile with "cc adaptchol.c -lm", then run with "a.out".
+ Compile with "gcc -lm adaptchol.c -o adaptchol", then run with "./adaptchol".
  
  Upon completion, can run 'source("adaptx")' in R to see a trace plot
  of the first coordinate.  Also, can run '<<adaptmath' in Mathematica to
@@ -28,11 +30,12 @@
 
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
 
 /* #define NUMITS 1000000 */
-#define NUMITS 5000000
+#define NUMITS 10000
 
 /* #define DIM 200 */
 #define DIM 200
@@ -57,21 +60,24 @@
 
 #define PI 3.14159265
 
-double drand48();
-
 double targetinvcov[DIM][DIM];
 
-main()
+double targlogdens(double w[DIM]);
+int seedrand(void);
+double normal(void);
+int imin(int a, int b);
+
+int main(int argc, char *argv[])
   
 {
   
-  int i,j,k,t, firsttime, numaccept, xspacing, bspacing, aspacing;
+  int i,j,k,t, numaccept, xspacing, bspacing, aspacing;
   double X[DIM], Y[DIM];
   double empcov[DIM][DIM], invtargetsqrt[DIM][DIM];
   double chol[DIM][DIM], normalsvec[DIM];
   double meanx[DIM], oldmeanx[DIM];
   double covsumsq[DIM][DIM], prevcovsumsq[DIM][DIM], compmat[DIM][DIM];
-  double ell, A, tmpsum, normal(), targlogdens();
+  double ell, A, tmpsum;
   FILE *fpmath, *fpx, *fpr, *fpe, *fpb, *fpa;
   struct timeval currtv;
   double begintime, endtime;
@@ -80,7 +86,6 @@ main()
   /* INITIALISATIONS. */
   seedrand();
   ell = 2.381204;
-  firsttime = 10*DIM;
   for (i=0; i<DIM; i++) {
     X[i] = meanx[i] = 0.0;
     for (j=0; j<DIM; j++) {
@@ -148,7 +153,7 @@ main()
         for (j=0; j<DIM; j++) {
           fprintf(fpb, " %f", targetinvcov[i][j]);
           if ( (i<DIM-1) || (j<DIM-1) ) {
-            fprintf(fpb, ",", targetinvcov[i][j]);
+            fprintf(fpb, ",");
           }
         }
       }
@@ -342,7 +347,7 @@ main()
           
           gettimeofday(&currtv, (struct timezone *)NULL);
       endtime = 1.0*currtv.tv_sec + 0.000001*currtv.tv_usec;
-      printf("\n\nEnding, dimension=%d, time=%f, ellapsed=%d secs.\n\n",
+      printf("\n\nEnding, dimension=%d, time=%f, ellapsed=%f secs.\n\n",
              DIM, endtime, endtime-begintime );
       
       /* COMPUTE COMPMAT MATRIX. */
@@ -515,9 +520,9 @@ double targlogdens( double w[DIM] )
 
 
 /* SEEDRAND: SEED RANDOM NUMBER GENERATOR. */
-seedrand()
+int seedrand(void)
 {
-  int i, seed;
+  int seed;
   struct timeval tmptv;
   gettimeofday (&tmptv, (struct timezone *)NULL);
   /* seed = (int) (tmptv.tv_usec - 1000000 *
@@ -530,9 +535,9 @@ seedrand()
 
 
 /* NORMAL:  return a standard normal random number. */
-double normal()
+double normal(void)
 {
-  double R, theta, drand48();
+  double R, theta;
   
   R = - log(drand48());
   theta = 2 * PI * drand48();
