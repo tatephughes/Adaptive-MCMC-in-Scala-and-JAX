@@ -35,10 +35,10 @@
 #include <sys/time.h>
 
 /* #define NUMITS 1000000 */
-#define NUMITS 1000000
+#define NUMITS 10000
 
 /* #define DIM 200 */
-#define DIM 100
+#define DIM 200
 
 #define beta 0.05  /* set beta = 0.0 for purest adapting */
 

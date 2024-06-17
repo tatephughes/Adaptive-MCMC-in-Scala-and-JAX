@@ -56,7 +56,7 @@ $b$ should approach 1 as the chain approaches the stationary distribution. Rough
 
 * Example Target
 
-We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma = M \in \mathbb R^{d\times d}$ is a matrix with random $\mathcal N[0,1]$ entries. In Scala, this can be found as below;
+We target the distribution $\pi(\cdot)\sim \mathcal N(0,\Sigma)$, where $\Sigma$ is a matrix sampled from a 'standard' inverse Wishart distribution, i.e., $\Sigma=MM^{\intercal}$, where $M\in\mathbb R^{n \times n}$ is a matrix with random $\mathcal N[0,1]$ entries. In Scala, this can be found as below;
 
 #+begin_src scala
 import AdaptiveMetropolis._
@@ -199,6 +199,7 @@ import jax.numpy as jnp
 import jax.random as rand
 import csv
 import numpy as np
+from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
 
 # keys for PRNG
 key = rand.PRNGKey(seed=1)
@@ -207,9 +208,9 @@ d = 100
 
 # create a chaotic variance matrix to target
 M = rand.normal(key, shape = (d,d))
-sigma = M.T @ M
+sigma = inv(M @ M.T)
 
-with open('data/chaotic_variance.csv', 'w', newline='') as csvfile:
+with open('data/very_chaotic_variance.csv', 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerows(np.array(sigma))
 
@@ -299,7 +300,7 @@ We can also plot the final sub-optimality factor, $b$, over all the dimensions;
 #+begin_src R :session example :results graphics file :file Figures/plot_b_laptop.png :width 1000 :exports both
 b_graph <- ggplot(data, aes(x = d, y = b, color = proc)) +
   geom_line(size = 2) +
-  scale_color_manual(values = c("JAX" = "red", "Scala" = "blue", "R" = "darkgreen")) +
+  scale_color_manual(values = c("JAX32" = "red", "JAX64" = "pink", "Scala" = "blue", "R" = "darkgreen")) +
   theme_minimal() + 
   labs(title = "Effectiveness against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
        x = "Dimension",
@@ -312,3 +313,31 @@ print(b_graph)
 [[file:Figures/plot_b_laptop.png]]
 
 We can see that while both perform equally as well, JAX maintains a good lead in terms of speed over both Scala and especially R.
+
+* Mixing
+
+This is the graph comparing the two versions of the algorithms' mixing capabilities (full description to be written)
+
+#+begin_src R :session example :results graphics file :file ~/RoamNotes/Figures/plot_mixing.png :height 600 :width 1200 :exports both
+jax_b_mixing <- cbind(1:100,read.csv("./data/so_factor_mixing.csv", header = FALSE)) %>%
+  mutate(proc = "Mixing")
+names(jax_b_mixing) <- c("j", "alsoj","b", "proc")
+jax_b_not_mixing <- cbind(1:100,read.csv("./data/so_factor_not_mixing.csv", header = FALSE)) %>%
+  mutate(proc = "Not Mixing")
+names(jax_b_not_mixing) <- c("j", "alsoj","b", "proc")
+
+data <- rbind(jax_b_mixing, jax_b_not_mixing)
+
+plot_mixing <- ggplot(data, aes(x = j, y = b, color = proc)) +
+  geom_line(size = 2) +
+  scale_color_manual(values = c("Mixing" = "blue", "Not Mixing" = "red")) +
+  theme_minimal() + 
+  labs(title = "Mixing Factor (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
+       x = "j",
+       y = "b") +
+  theme(text = element_text(size = 20))
+print(plot_mixing)
+#+end_src
+
+#+RESULTS:
+[[file:~/RoamNotes/Figures/plot_mixing.png]]

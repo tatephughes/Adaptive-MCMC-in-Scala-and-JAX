@@ -9,7 +9,7 @@ import reflect.Selectable.reflectiveSelectable
 import scala.io.Source
 import scala.util.chaining
 
-// random basis and seed for PRNG
+// randombasis and seed for PRNG
 implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(41L)))
 
 // A class for the state of the chaining
@@ -17,7 +17,9 @@ implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator
 case class AM_state(j: Double, 
                     x: DenseVector[Double], 
                     x_mean: DenseVector[Double],
-                    prop_cov: DenseMatrix[Double])
+                    prop_cov: DenseMatrix[Double],
+                    accept_count: Int
+)
 
 extension[T](ll: LazyList[T]){
   // Extension of the LazyList class for chain thinning, done in a memory-efficient way
@@ -35,14 +37,12 @@ object AdaptiveMetropolis:
   type dm = DenseMatrix[Double]
   type dv = DenseVector[Double]
 
-  def plotter(sample: Array[dv], // the sample to plot
-              file_path: String  // file to save to
+  def plot_trace(sample: Array[dv], // the sample to plot
+               file_path: String  // file to save to
     ): Unit = {
 
     /* Plots a trace plot of the dth coordinate of the given array of states,
     and saves the figure to ~file_path~
-
-    TODO add an argument for which coordinate to plot
      */
 
     val y = DenseVector(sample.map(x => x(1)))
@@ -55,12 +55,47 @@ object AdaptiveMetropolis:
     p.xlabel = "Step"
     p.ylabel = "First coordinate value"
 
-    p.title = "Trace Plot of the first coordinate, d=" + sample(1).length
+    p.title = "Trace Plot of the first coordinate, d = " + sample(1).length
     
     f.saveas(file_path)
 
   }
-  
+
+  def try_accept(state: AM_state,
+                 prop: dv,
+                 alpha: Double
+    ): AM_state = {
+
+      val j = state.j
+      val x = state.x
+      val x_mean = state.x_mean
+      val prop_cov = state.prop_cov
+      val accept_count = state.accept_count
+      val d = x.length
+
+      val log_prob = math.min(0.0, alpha)
+
+      // Try accept the proposal
+      val (x_new, is_accepted) = if (math.log(Uniform(0,1).draw()) < log_prob) then {
+        (prop, 1)
+      } else {
+        (x, 0)
+      }
+
+      // Update mean and Covariance
+      val x_mean_new = ((j-1)*x_mean + x_new)/j
+      val prop_cov_new = {
+        prop_cov*(j-1)/j +
+          (j * (x_mean * x_mean.t) -
+          (j+1)*(x_mean_new * x_mean_new.t) +
+          (x_new * x_new.t) +
+            0.01*(DenseMatrix.eye[Double](d))) * 5.6644/(j*d)
+      }
+
+      return(AM_state(j+1, x_new, x_mean_new, prop_cov_new, accept_count+is_accepted))
+
+    }
+
   def adapt_step(state: AM_state, // The state of the chain
                  q: dm, r: dm,    // The QR-decomposition of the target Covariance
                  prog: Boolean    // Flag for whether to print diagnositcs to console
@@ -70,12 +105,13 @@ object AdaptiveMetropolis:
     Hastings Ratio, and returns the next state
      */
 
-    // Extract key values from the state
+    // Extract values from the state
     // TODO Maybe remove to reduce cloning
     val j = state.j
     val x = state.x
     val x_mean = state.x_mean
     val prop_cov = state.prop_cov
+    val accept_count = state.accept_count
     val d = x.length
 
     // print progress every 1000 iterations if 'prog=true'
@@ -86,36 +122,23 @@ object AdaptiveMetropolis:
       print(s"** Used Memory (MB): ${(runtime.totalMemory-runtime.freeMemory)/(1048576)}")
     }
 
-    val prop = MultivariateGaussian(x, prop_cov).draw()
+    val prop = if (j <= 2*d){
+      // 'Safe' sampler
+      // NOTE: I would imagine there is a more appropriate univariate
+      // Gaussian sampler for this purpose
+      MultivariateGaussian(x, (0.01/d)*DenseMatrix.eye[Double](d)).draw()
+    } else {
+      // 'Adaptive' sampler
+      MultivariateGaussian(x, prop_cov).draw()
+    }
 
     // The log Hastings Ratio
     val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (prop.t * (r \ (q.t * prop))))
-    val log_prob = math.min(0.0, alpha)
-    val u = Uniform(0,1).draw()
-
-    // Try accept the proposal
-    val x_new = if (math.log(u) < log_prob) then {
-      prop
-    } else {
-      x
-    }
-
-    // Update mean and Covariance
-    val x_mean_new = ((j-1)*x_mean + x_new)/j
-    val prop_cov_new = if (j <= 2*d) {
-      prop_cov
-    } else {
-      prop_cov*(j-1)/j +
-        (j * (x_mean * x_mean.t) -
-        (j+1)*(x_mean_new * x_mean_new.t) +
-        (x_new * x_new.t) +
-        0.01*(DenseMatrix.eye[Double](d))) * 5.6644/(j*d).toDouble
-    }
-
+    
     // NOTE: seems inefficient to construct a diagonal identity matrix like this,
     // I would imagine there is a better way to do this
 
-    return(AM_state(j+1, x_new, x_mean_new, prop_cov_new))
+    return(try_accept(state, prop, alpha))
 
   }
 
@@ -132,29 +155,20 @@ object AdaptiveMetropolis:
     LazyList.iterate(state0)((state: AM_state) => adapt_step(state, q, r, prog))
   }
 
-  def effectiveness(sigma: dm, sigma_j: dm): Double = {
+  def sub_optim_factor(sigma: dm, sigma_j: dm): Double = {
 
     /* Computes the sub-optimality factor between the true target covariance
     ~sigma~ and the sampling covariance ~sigma_j~, from Roberts and Rosethal
      */
 
-    // NOTE: Currently computed innefficiently, needs overhaul
+    val lambda = eig(sigma_j * inv(sigma)).eigenvalues
 
-    val d = sigma.cols
-
-    val sigma_j_decomp = eig(sigma_j)
-    val sigma_decomp = eig(sigma)
-
-    val rootsigmaj = sigma_j_decomp.eigenvectors * diag(sqrt(sigma_j_decomp.eigenvalues)) * inv(sigma_j_decomp.eigenvectors)
-    val rootsigmainv  = inv(sigma_j_decomp.eigenvectors * diag(sqrt(sigma_decomp.eigenvalues)) * inv(sigma_decomp.eigenvectors))
-
-    val lambda = eig(rootsigmaj * rootsigmainv).eigenvalues
     val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
     val lambdainvsum = sum(lambda.map(x => 1/x))
 
     // According to Roberts and Rosenthal, this should go to
     // 1 at the stationary distribution
-    val b = d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))
+    val b = sigma.cols * (lambdaminus2sum / (lambdainvsum*lambdainvsum))
 
     return(b)
 
@@ -162,7 +176,7 @@ object AdaptiveMetropolis:
 
   def run_with_complexity(sigma_d: dm): (Int, Int, Int, Double, Double) = {
 
-    /* Runs the main loop on a given target Covariance, and gets the time the main
+     /* Runs the main loop on a given target Covariance, and gets the time the main
      loop took.
      */
 
@@ -176,41 +190,29 @@ object AdaptiveMetropolis:
     val state0 = AM_state(1.0,
                           DenseVector.zeros[Double](d),
                           DenseVector.zeros[Double](d),
-                          0.01 * DenseMatrix.eye[Double](d) / d.toDouble)
+                          0.01 * DenseMatrix.eye[Double](d) / d.toDouble,
+                          0
+    )
 
     // Start of the computation
     val startTime = System.nanoTime()
 
     val am_sample = AM_iterator(state0, sigma_d, false).drop(burnin).thin(thinrate).take(n).toArray
 
-
     val endTime = System.nanoTime()
+
     // The time of computation is seconds
     val duration = (endTime - startTime) / 1e9d
 
-    val sigma_j = cov(DenseMatrix(am_sample.map(_.x): _*))
+    val sigma_j = am_sample.last.prop_cov
 
-    ///val sigma_decomp = eig(sigma_d)
-
-    //val rootsigmaj = sigma_j_decomp.eigenvectors * diag(sqrt(sigma_j_decomp.eigenvalues)) * inv(sigma_j_decomp.eigenvectors)
-    //val rootsigmainv  = inv(sigma_decomp.eigenvectors * diag(sqrt(sigma_decomp.eigenvalues)) * inv(sigma_decomp.eigenvectors))
-
-    //val lambda = eig(rootsigmaj * rootsigmainv).eigenvalues
-    //val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
-    //val lambdainvsum = sum(lambda.map(x => 1/x))
-
-    // According to Roberts and Rosenthal, this should go to
-    // 1 at the stationary distribution
-    //val b = d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))
-
-    val b = effectiveness(sigma_d, sigma_j) // CHECK AND MAKE SURE THIS WORKS
-    // then clear up the above mess
+    val b = sub_optim_factor(sigma_d, sigma_j)
 
     return(n,thinrate,burnin, duration, b)
 
   }
 
-  def compute_time_graph(sigma: dm, csv_file: String): Unit = {
+  def compute_time_graph(sigma: dm, csv_file: String = "./data/Scala_compute_times_test.csv"): Unit = {
 
     /* Loop through all the primary minors of ~sigma~ and runs the complexity test
     on each of them, saving the result to ~csv_file~
@@ -237,11 +239,21 @@ object AdaptiveMetropolis:
     }
 
   }
-    
-  def run(): Unit =
+
+  def generate_sigma(d:Int): dm = {
+
+    val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
+    val M = DenseMatrix(data: _*)
+    val sigma = M.t * M
+
+    return(sigma)
+
+  }
+
+  def read_sigma(d: Int): dm = {
 
     // Read the file lines, skipping empty lines
-    val lines = Source.fromFile("data/chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
+    val lines = Source.fromFile("./data/chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
 
     // Assuming the CSV is well-formed and every row has the same number of columns
     val data = lines.map(_.split(",").map(_.toDouble))
@@ -251,35 +263,28 @@ object AdaptiveMetropolis:
     val numCols = data.head.length
 
     // Creating the DenseMatrix
-    val sigma_d = DenseMatrix(data: _*).reshape(numRows, numCols)
+    val sigma = DenseMatrix(data: _*).reshape(numRows, numCols)
 
-    compute_time_graph(sigma_d, "data/scala_compute_times_laptop_1.csv")
+    return(sigma(0 until d, 0 until d))
 
-  @main def simple_run(): Unit = 
+  }
 
-    //val d: Int = 10
-    //val n: Int = 100000        // size of the desired sample
-    //val thinrate: Int = 10     // the thinning rate
-    //val burnin: Int = 10000    // the number of iterations for burn-in
-
-
-    // high d
-    val d: Int = 10
-    val n: Int = 100000
-    val thinrate: Int = 10
-    val burnin: Int = 100000
+  def main(d: Int = 10,
+    n: Int = 1000, thinrate: Int = 10,
+    burnin: Int = 10000, file: String = "./Figures/adaptive_trace_Scala.png",
+    get_sigma: Int => dm = generate_sigma ): Unit = {
 
     // initial state
     val state0 = AM_state(1.0,
                           DenseVector.zeros[Double](d),
                           DenseVector.zeros[Double](d),
-                          0.01 * DenseMatrix.eye[Double](d) / d.toDouble)
-
-    val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
-    val M = DenseMatrix(data: _*)
-    val sigma = M.t * M
+                          0.01 * DenseMatrix.eye[Double](d) / d.toDouble,
+                          0
+    )
 
     val startTime = System.nanoTime()
+
+    val sigma = get_sigma(d)
 
     // the sample
     val am_sample = AM_iterator(state0, sigma, false).drop(burnin).thin(thinrate).take(n).toArray
@@ -288,29 +293,31 @@ object AdaptiveMetropolis:
     val endTime = System.nanoTime()
     val duration = (endTime - startTime) / 1e9d
 
-    // Empirical Variance matrix of the sample
-    val sigma_j = cov(DenseMatrix(am_sample.map(_.x): _*))
+    // Final Sampling covariance
+    val sigma_j = am_sample.last.prop_cov
+    val acc_rate = am_sample.last.accept_count.toDouble / (n*thinrate+burnin)
 
-    //val sigma_j_decomp = eig(sigma_j)
-    //val sigma_decomp = eig(sigma)
+    // According to Roberts and Rosethal, this value should go to 1.
+    val b1 = sub_optim_factor(sigma, DenseMatrix.eye(d))
+    val b2 = sub_optim_factor(sigma, sigma_j)
 
-    //val rootsigmaj = sigma_j_decomp.eigenvectors * diag(sqrt(sigma_j_decomp.eigenvalues)) * inv(sigma_j_decomp.eigenvectors)
-    //val rootsigmainv  = inv(sigma_decomp.eigenvectors * diag(sqrt(sigma_decomp.eigenvalues)) * inv(sigma_decomp.eigenvectors))
+    print("\nThe optimal sampling value of x_1 is " + (5.6644/d) * sigma(0,0))
+    print("\nThe actual sampling value of x_1 is  " + sigma_j(0,0))
+    print("\nThe initial b value is " + b1)
+    print("\nThe final b value is " + b2)
+    print("\nThe acceptance rate is " + acc_rate)
+    print("\nThe computation took " + duration + " seconds\n" )
 
-    //val lambda = eig(rootsigmaj * rootsigmainv).eigenvalues
-    //val lambdaminus2sum = sum(lambda.map(x => 1/(x*x)))
-    //val lambdainvsum = sum(lambda.map(x => 1/x))
+    plot_trace(am_sample.map(_.x), "./Figures/adaptive_trace_scala_d_10.png")
+  }
 
-    // According to Roberts and Rosenthal, this should go to
-    // 1 at the stationary distribution
-    // val b = d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))
+  @main def run(): Unit = {
+    
+    //compute_time_graph(sigma_d, "data/scala_compute_times_laptop_1.csv")
 
-    val b = effectiveness(sigma, sigma_j) // CHECK AND MAKE SURE THIS WORKS
+    main(file = "./Figures/adaptive_trace_JAX_d_10.png",
+         get_sigma = read_sigma)
 
+  }
 
-    print("\nThe true variance of x_1 is " + sigma(1,1))
-    print("\nThe empirical sigma value is " + sigma_j(1,1))
-    print("\nThe b value is " + b)
-    print("\nThe computation took " + duration + " seconds" )
-
-    plotter(am_sample.map(_.x), "./Figures/adaptive_trace_scala_d_10.png")
+    

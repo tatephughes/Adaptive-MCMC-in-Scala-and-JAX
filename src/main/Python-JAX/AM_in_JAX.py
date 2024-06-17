@@ -9,6 +9,8 @@ from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
 import time
 from AM_in_JAX_tests import *
 import csv
+import os
+import re
 
 jax.config.update('jax_enable_x64', False)
 
@@ -20,58 +22,46 @@ def try_accept(state, prop, alpha, mix, key):
   prop -- The proposed move, x
   alpha -- The pre-calculated log of the Hastings ratio
   key -- PRNG keys
-
+  
   return -- The next state (tuple) of the chain with updated mean and covariance
   """
-
-  j       = state[0]
-  x       = state[1]
-  x_mean  = state[2]
-  prop_cov   = state[3]
-  d       = x.shape[0]
+  
+  j        = state[0]
+  x        = state[1]
+  x_mean   = state[2]
+  prop_cov = state[3]
+  accept_count = state[4]
+  d        = x.shape[0]
   
   log_prob = jnp.minimum(0.0, alpha)
-
+  
   u = rand.uniform(key)
 
   x_new, is_accepted = jl.cond((jnp.log(u) < log_prob),
-                               0, lambda _: (prop, True),
-                               0, lambda _: (x, False))
+                               0, lambda _: (prop, 1),
+                               0, lambda _: (x, 0))
 
   x_mean_new = x_mean*(j-1)/j  + x_new/j
 
-  prop_cov_new = jnp.select(condlist   = [not mix],
-                            choicelist = [prop_cov*((j-1)/j) + (j*jnp.outer(x_mean,x_mean) -
-                                                                (j+1)*jnp.outer(x_mean_new,x_mean_new) +
-                                                                jnp.outer(x_new,x_new) +
-                                                                0.01*jnp.identity(d)
-                                                                )*5.6644/(j*d)],
-                            default = prop_cov*((j-1)/j) + (j*jnp.outer(x_mean,x_mean) -
-                                                                (j+1)*jnp.outer(x_mean_new,x_mean_new) +
-                                                                jnp.outer(x_new,x_new))*5.6644/(j*d))
+  prop_cov_new = jnp.select(condlist   = [mix, not mix],
+                            choicelist = [
+                              prop_cov*((j-1)/j) # this isn't good for float computation, maybe?
+                              + (jnp.outer(x-x_mean, x-x_mean_new))*5.6644/(j*d),
+                              prop_cov*((j-1)/j)
+                              + (j*jnp.outer(x_mean,x_mean) -
+                                 (j+1)*jnp.outer(x_mean_new,x_mean_new) +
+                                 jnp.outer(x_new,x_new) +
+                                 0.01*jnp.identity(d)
+                                 )*5.6644/(j*d)],
+                            default = 1)
 
-  
-  
-  # THIS DOES NOT DO THINGS CORRECTLY!!!!!!!!
-  # Implements the covariance update equation
-  #prop_cov_new = jl.cond(j <= 2*d,
-  #                       j,
-  #                       lambda t: prop_cov,
-  #                       j,
-  #                       lambda t: prop_cov*((t-1)/t) + (t*jnp.outer(x_mean,x_mean) - (t+1)*jnp.outer(x_mean_new,x_mean_new) + jnp.outer(x_new,x_new) + 0.01*jnp.identity(d))*5.6644/(t*d))
-
-  # this won't work, since this function does not have access to all previous samples!
-  #prop_cov_new = jnp.select(condlist = [j < 2*d, j = 2*d, j > 2*d],
-  #                          choicelist = [prop_cov,
-  #                                        cov()])
-  
   # NOTE: seems inefficient to construct a diagonal identity matrix like this, I would imagine there is a better way to do this
   
   return((j + 1,
           x_new,
           x_mean_new,
           prop_cov_new,
-          is_accepted))
+          accept_count+is_accepted))
 
 def adapt_step(state, q, r, mix, key):
 
@@ -84,26 +74,19 @@ def adapt_step(state, q, r, mix, key):
     return -- The next state of the chain
     """
     
-    j        = state[0]
-    x        = state[1]
-    d        = x.shape[0]
-
-    # choose proposal covariance based on j
-    prop_cov = jnp.select(condlist   = [j <= 2*d, j > 2*d],
-                          choicelist = [((0.1)**2) * jnp.identity(d)/d,
-                                        state[3]],
-                          default = 1)
-
+    j = state[0]
+    x = state[1]
+    d = x.shape[0]
+    prop_cov = state[3]
+    
     keys = rand.split(key,3)
 
-    # feels like code duplication, needs revision
-    prop = jnp.select(condlist   = [not mix, rand.uniform(keys[0]) > 0.05],
-                      choicelist = [rand.multivariate_normal(keys[1], x, prop_cov),
-                                    rand.multivariate_normal(keys[1], x, prop_cov)],
-                      default = rand.normal(keys[2], shape=(d,))/(100*d) + x)
-
-
-    # Compute the log Hastings ratio
+    prop = jl.cond((j <= 2*d) | (mix & (rand.uniform(keys[0]) < 0.01)),
+                   lambda key: rand.normal(key, shape=(d,))/(100*d) + x, # 'Safe' sampler
+                   lambda key: rand.multivariate_normal(key, x, prop_cov), # 'Adaptive' sampler
+                   keys[1])
+    
+    # Compute the log Hastings ratio///
     alpha = 0.5 * (x.T @ (solve(r, q.T @ x))
                    - (prop.T @ solve(r, q.T @ prop)))
 
@@ -111,15 +94,19 @@ def adapt_step(state, q, r, mix, key):
 
 def cov(sample):
     
-    means = jnp.mean(sample, axis=0)
-
-    deviations = sample - means
+    means = jnp.mean(sample, axis=1)
+    
+    deviations = sample.T - means
     
     N = sample.shape[0]
     
-    covariance = jnp.dot(deviations, deviations) / (N - 1)
+    covariance = (deviations.T @ deviations) / (N - 1)
     
     return covariance
+
+def mhead(M, n=3):
+
+    return M[0:n,0:n]
 
 def thinned_step(thinrate, state, q, r, mix, key):
 
@@ -130,37 +117,54 @@ def thinned_step(thinrate, state, q, r, mix, key):
     # I think this should scan over the keys!
     return jl.fori_loop(0, thinrate, (lambda i, x: adapt_step(x, q, r, mix, keys[i])), state)
 
-def effectiveness(sigma, sigma_j):
+def sub_optim_factor(sigma, sigma_j):
 
     """Computes the sub-optimality factor between the true target covariance ~sigma~ and the sampling covariance ~sigma_j~, from Roberts and Rosethal
     """
-
+    
     d = sigma.shape[0]
     
+    """
     sigma_j_decomp = eigh(sigma_j)
     sigma_decomp = eigh(sigma)
     
     rootsigmaj = sigma_j_decomp[1] @ jnp.diag(jnp.sqrt(sigma_j_decomp[0])) @ inv(sigma_j_decomp[1])
-    rootsigmainv = inv(sigma_decomp[1] @ jnp.diag(jnp.sqrt(sigma_decomp[0])) @ inv(sigma_decomp[1]))
+    rootsigmainv = inv(sigma_decomp[1]) @ jnp.diag(1/jnp.sqrt(sigma_decomp[0])) @ sigma_decomp[1]
 
     # the below line relies on the ~eig~ function which doesn't work on GPUs
     lam = eig(rootsigmaj @ rootsigmainv)[0]
-    lambdaminus2sum = sum(1/(lam*lam))
-    lambdainvsum = sum(1/lam)
+    """
 
-    b = (d * (lambdaminus2sum / (lambdainvsum*lambdainvsum))).real
+    # maybe they meant cholesky?
+    #lam = eig(cholesky(sigma_j) @ inv(cholesky(sigma)))[0]
+    # the cleanest BUT NOT THE MOST EFFICIENT
+    #lam = eig(mat_sqrt(sigma_j) @ inv(mat_sqrt(sigma)))[0]
+
+    # without the square roots?
+    #lam = eig(sigma_j @ inv(sigma))[0]
+
+    # looking at their code, this might be what was intended?
+    lam = eig(sigma_j @ inv(sigma))[0]
+    
+    b = (d * sum(lam**-2) / sum(lam**-1)**2).real
 
     return b
 
-def plotter(sample, file_path, d):
+def mat_sqrt(M):
 
-    """Plots a trace plot of the dth coordinate of the given array of states,
+    M_decomp = eig(M) # doesn't take advantage of the matrix properties!
+
+    return M_decomp[1] @ jnp.diag(jnp.sqrt(M_decomp[0])) @ inv(M_decomp[1])
+
+def plot_trace(sample, file_path, j=0):
+
+    """Plots a trace plot of the jth coordinate of the given array of states,
     and saves the figure to ~file_path~"""
     
-    first = sample[:,0]
+    first = sample[:,j]
     plt.figure(figsize=(590/96,370/96))
     plt.plot(first)
-    plt.title(f'Trace plot of the first coordinate, d={d}')
+    plt.title(f'Trace plot of coordinate {j}')
     plt.xlabel('Step')
     plt.ylabel('First coordinate value')
     plt.grid(True)
@@ -187,7 +191,7 @@ def run_with_complexity(sigma_d, key):
     mix = False
 
     keys = rand.split(key, n + burnin + 1)
-    state0 = (1, jnp.zeros(d), jnp.zeros(d), jnp.identity(d)/d, False)
+    state0 = (1, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, 0)
     
     def step(carry, key):
         nextstate = thinned_step(thinrate, carry, Q, R, mix, key)
@@ -197,16 +201,16 @@ def run_with_complexity(sigma_d, key):
     
     # inital state, after burnin
     start_state = jl.fori_loop(1, burnin+1, lambda i,x: adapt_step(x, Q, R, mix, keys[i]), state0)
+
     # the sample
     am_sample = jl.scan(step, start_state, keys[burnin+1:])[1]
 
     end_time = time.time()
     duration = time.time()-start_time
     
-    sigma_j = cov(am_sample[1])
+    sigma_j = am_sample[3][-1]
 
-    # THIS AINT QUITE RIGHT
-    b = effectiveness(sigma_d,sigma_j)
+    b = sub_optim_factor(sigma_d,sigma_j)
 
     return n, thinrate, burnin, duration, float(b) # making it into a normal float for readability
 
@@ -227,57 +231,68 @@ def compute_time_graph(sigma, csv_file):
         writer = csv.writer(csvfile)
         writer.writerows(y)
 
-def mixing_test(sigma, mix = False):
-    
-    Q, R = qr(sigma) # take the QR decomposition of sigma
-
-    d = sigma.shape[0]
-    
-    # these numbers get good results up to d=100
-    n = 10000
+def generate_sigma(d):
 
     key = jax.random.PRNGKey(seed=1)
-    keys = rand.split(key, n)
+    M = rand.normal(key, shape = (d,d))
+    return M @ M.T
 
-    state0 = (1, jnp.zeros(d), jnp.zeros(d), jnp.identity(d)/d, False)
+def read_sigma(d, file_path = './data/chaotic_variance.csv'):
+
+    matrix = []
+    with open(file_path, 'r', newline='') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            matrix.append([float(item) for item in row])
+    return jnp.array(matrix)[0:d,0:d]
+
+def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_test.csv"):
     
-    def step(carry, key):
-        nextstate = thinned_step(1, carry, Q, R, mix, key)
-        return(nextstate, nextstate)
+    sigma = get_sigma(d=10)
+    Q, R = qr(sigma) # take the QR decomposition of sigma
+    d = sigma.shape[0]
+    
+    n = 100
 
-    prop_vars = jl.scan(step, state0, keys)[1][3]
+    key = jax.random.PRNGKey(seed=1)
 
-    eff_func = lambda M: effectiveness(sigma, M)
+    sample = main(d=d, n=n, thinrate=20000, burnin=0,
+                  file = "./Figures/adaptive_trace_JAX_mixing.png",
+                  mix=mix, get_sigma=lambda d:sigma[0:d,0:d])
+
+    print(sub_optim_factor(sigma, sample[3][-1]))
+    
+    eff_func = lambda M: sub_optim_factor(sigma, M)
     eff_vectorised = jax.vmap(eff_func)
     
-    b_values = eff_vectorised(prop_vars[1:]/(5.6644/d))
+    b_values = eff_vectorised(sample[3])
 
-    return b_values
+    y = jnp.column_stack((sample[0], b_values))
+    
+    with open(csvfile, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(y)
 
-def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace_JAX.png", mix = False):
+def main(d=10, n=1000, thinrate=10, burnin=10000,
+         file="./Figures/adaptive_trace_JAX_test.png",
+         mix = False,
+         get_sigma = generate_sigma):
 
-    """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.
+    """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.I
     """
 
     # the actual number of iterations is n*thin + burnin
-    # computed_size = n*thinrate + burnin
 
     # keys for PRNG
     key = jax.random.PRNGKey(seed=1)
     keys = rand.split(key, n + burnin + 1)
     
-    # create a chaotic variance matrix to target
-    M = rand.normal(keys[0], shape = (d,d))
-    sigma = M.T @ M
+    sigma = get_sigma(d=d)
     Q, R = qr(sigma) # take the QR decomposition of sigma
 
     # initial state before burn-in
-    state0 = (1, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, False)
+    state0 = (1, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, 0)
 
-    # JAX's ~scan~ isn't quite ~iterate~, so this is a 'dummy'
-    # function with an unused argument to call thinned_step for the
-    # actually used samples
-    # NOTE: this comment may be out of date now that I am scanning over the keys
     def step(carry, key):
         nextstate = thinned_step(thinrate, carry, Q, R, mix, key)
         return(nextstate, nextstate)
@@ -290,46 +305,47 @@ def main(d=10, n=100000, thinrate=10, burnin=10000, file="Figures/adaptive_trace
     # the sample
     am_sample = jl.scan(step, start_state, keys[burnin+1:])[1]
 
-    # the tiume of the computation in seconds
+    # the time of the computation in seconds
     end_time = time.time()
     duration = time.time() - start_time
     
-    # the empirical covariance of the sample
-    #sigma_j = cov(am_sample[1])
+    # The final sampling covariance
     sigma_j = am_sample[3][-1] / (5.6644/d)
-    b = effectiveness(sigma,sigma_j)
+    acc_rate = am_sample[4][-1] / (n*thinrate+burnin)
 
-    #print(f"The true variance of x_1 is {sigma[0,0]}")
-    #print(f"The empirical sigma value is {C_j[0,0]}")
-    print(f"The optimal sampling value is {sigma[0,0] * (5.6644/d)}")
-    print(f"The actual sampling value is {sigma_j[0,0] * (5.6644/d)}")
-    print(f"The b value is {b}")
+    # According to Roberts and Rosethal, this value should go to 1.
+    b1 = sub_optim_factor(sigma, jnp.identity(d))
+    b2 = sub_optim_factor(sigma,sigma_j)
+
+    print(f"The optimal sampling value of x_1 is {sigma[0,0] * (5.6644/d)}")
+    print(f"The actual sampling value of x_1 is  {sigma_j[0,0] * (5.6644/d)}")
+    print(f"The initial b value is {b1}")
+    print(f"The final b value is {b2}")
+    print(f"The acceptance rate is {acc_rate}")
     print(f"The computation took {duration} seconds")
 
     # instead of this plotter function, i want it to write am_sample with all b values to a csv.
-    plotter(am_sample[1], file, d)
+    plot_trace(am_sample[1], file, 1)
     
     return am_sample
 
 if __name__ == "__main__":
-    #test_try_accept()
-    #test_init_step()
-    #test_adapt_step()
-    #test_AM_hstep()
-    #test_thinned_step()
-    
-    main(file = "../../../Figures/adaptive_trace_JAX_d_10.png", mix = True)
-    
-    #or high dimensions
-    
-    #main(d=200, n=10000, thinrate=100, burnin=1000000, file ="Figures/adaptive_trace_JAX_d_200.png")
 
-    # For computing the time graph
+    # This code checks wether the working directory is correct, and if not, attemps
+    # to change it.
+    if not (re.search(r".*/Adaptive-MCMC-in-Scala-and-JAX$", os.getcwd())):
+        os.chdir("../../../")
+        if not (re.search(r".*/Adaptive-MCMC-in-Scala-and-JAX$", os.getcwd())):
+            print("ERROR: Cannot find correct working directory")
+        else:
+            print("Succesfully found working directory")
+    else:
+        print("In correct working directory")
     
-    #matrix = []
-    #with open('./data/chaotic_variance.csv', 'r', newline='') as file:
-    #    reader = csv.reader(file)
-    #    for row in reader:
-    #        matrix.append([float(item) for item in row])
-    #sigma = jnp.array(matrix)
-    #compute_time_graph(sigma, "data/JAX_64bit_compute_times_laptop_1.csv")
+    #sample = main(file = "./Figures/adaptive_trace_JAX_test.png", mix = True, get_sigma=read_sigma)
+
+    compute_time_graph(read_sigma(d=10), "data/JAX_64bit_compute_times_laptop_test.csv")
+    #mixing_test(read_sigma, mix=True,
+    #            csvfile = "./data/so_factor_mixing.csv")
+    #mixing_test(read_sigma, mix=False,
+    #            csvfile = "./data/so_factor_not_mixing.csv")

@@ -22,11 +22,12 @@ class AMSuite extends AnyFlatSpec{
   val state0 = AM_state(0.0,
     DenseVector.zeros[Double](d),
     DenseMatrix.eye[Double](d),
-    DenseVector.zeros[Double](d)
+    DenseVector.zeros[Double](d),
+    0
   )
 
   "one_AMRTH_step" should "make a small initial step" in {
-    val state1 = AM_step(state0, r, q, false)
+    val state1 = adapt_step(state0, r, q, false)
     assert(norm(state1.x - state0.x) < 100*d)
   }
 
