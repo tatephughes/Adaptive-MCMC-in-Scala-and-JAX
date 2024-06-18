@@ -214,10 +214,12 @@ def run_with_complexity(sigma_d, key):
 
     return n, thinrate, burnin, duration, float(b) # making it into a normal float for readability
 
-def compute_time_graph(sigma, csv_file):
+def compute_time_graph(sigma, csv_file="./data/JAX_compute_times_test.csv", is_64_bit=False):
 
     """Loop through all the primary minors of ~sigma~ and runs the complexity test on each of them, saving the result to ~csv_file~
     """
+
+    jax.config.update('jax_enable_x64', is_64_bit)
     
     d = sigma.shape[0]
 

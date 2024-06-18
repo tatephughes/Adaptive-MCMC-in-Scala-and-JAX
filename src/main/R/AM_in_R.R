@@ -1,60 +1,7 @@
-
-#+TITLE: Adaptive Metropolis in R
-
-:BOILERPLATE:
-#+BIBLIOGRAPHY: Bibliography.bib
-#+LATEX_CLASS: article
-#+LATEX_CLASS_OPTIONS: [letterpaper]
-#+OPTIONS: toc:nil
-#+LATEX_HEADER: \usepackage{amsmath,amsfonts,amsthm,amssymb,bm,bbm,tikz,tkz-graph}
-#+LATEX_HEADER: \usetikzlibrary{arrows}
-#+LATEX_HEADER: \usetikzlibrary{bayesnet}
-#+LATEX_HEADER: \usetikzlibrary{matrix}
-#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
-#+LATEX_HEADER: \usepackage[english]{babel}
-#+LATEX_HEADER: \newtheorem{theorem}{Theorem}[section]
-#+LATEX_HEADER: \newtheorem{corollary}[theorem]{Corollary}
-#+LATEX_HEADER: \newtheorem{lemma}[theorem]{Lemma}
-#+LATEX_HEADER: \newtheorem{definition}[theorem]{Definition}
-#+LATEX_HEADER: \newtheorem*{remark}{Remark}
-#+LATEX_HEADER: \DeclareMathOperator{\E}{\mathbb E}}
-#+LATEX_HEADER: \DeclareMathOperator{\prob}{\mathbb P}
-#+LATEX_HEADER: \DeclareMathOperator{\var}{\mathbb V\mathrm{ar}}
-#+LATEX_HEADER: \DeclareMathOperator{\cov}{\mathbb C\mathrm{ov}}
-#+LATEX_HEADER: \DeclareMathOperator{\cor}{\mathbb C\mathrm{or}}
-#+LATEX_HEADER: \DeclareMathOperator{\normal}{\mathcal N}
-#+LATEX_HEADER: \DeclareMathOperator{\invgam}{\mathcal{IG}}
-#+LATEX_HEADER: \newcommand*{\mat}[1]{\bm{#1}}
-#+LATEX_HEADER: \newcommand{\norm}[1]{\left\Vert #1 \right\Vert}
-#+LATEX_HEADER: \renewcommand*{\vec}[1]{\boldsymbol{\mathbf{#1}}}
-#+EXPORT_EXCLUDE_TAGS: noexport
-:END:
-
-This file _is_ the source code; everything below gets 'tangled' into ~AM_in_R.R~.
-
-The code here is not fully commented, but since it is almost identical to the JAX code in logic, please refer to that code.
-
-* Boilerplate
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 library(MASS)
 library(ggplot2)
 library(mvnfast)
-#+end_src
 
-* Core Functions
-** ~try_accept~
-
-This function takes a state, a proposed move, and a log probabilty, and returns the next state, using the probability as expected.
-
-It outputs the next state, updating the mean and covariance by
-\begin{align*}
-\vec{\overline{X}}_t &= \frac{t-1}{t} \vec{\overline{X}}_{t-1} + \frac{1}{t} \vec X_t, \\
-\mat C_{t+1} &= \frac{t-1}{t} \mat C_t + \frac{s_d}{t}(t\vec{\overline{X}}_{t-1}\vec{\overline{X}}_{t-1}^{\intercal} - (t+1)\vec{\overline{X}}_t\vec{\overline{X}}_t^{\intercal} + \vec X_t\vec X_t^{\intercal} + \epsilon \mat I_d),\quad t\geq t_0.
-\end{align*}
-
-
-#+begin_src R :session example :results nonee :tangle AM_in_R.R
 try_accept <- function(state, prop, alpha, mix){
 
   j        = state$j
@@ -107,24 +54,7 @@ try_accept <- function(state, prop, alpha, mix){
               prop_cov = prop_cov_new,
               accept_count = accept_count + is_accepted))
 }
-#+end_src
 
-#+RESULTS:
-
-** ~adapt_step~
-
-This samples from the proposal distribution and computes the Hastings ratio;
-\begin{align*}
-q(\vec X_t^* \mid \vec X_0, \dots, X_{t-1}) \sim \mathcal N_d (\vec X_{t-1}, \mat C_t),
-\end{align*}
-
-with Hastings Ratio
-\begin{align*}
-\alpha = \frac12 \left[ \vec x^{\intercal} \mat \Sigma^{-1} \vec x - \vec x^{*\intercal} \mat \Sigma^{-1}\vec x^{*}\right].
-\end{align*}
-
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 adapt_step <- function(state, q, r, mix){
 
     j        = state$j
@@ -148,30 +78,14 @@ adapt_step <- function(state, q, r, mix){
     
     return(try_accept(state, prop, alpha, mix))
 }
-#+end_src
 
-** ~thinned_step~
-
- ~thinned_step~ uses a fori_loop to 'jump' steps, which JAX knows how to garbage collect. This is especially important for high dimensional samples.
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 thinned_step <- function(thinrate, state, q, r, mix){
   for (i in 1:thinrate) {
     state <- adapt_step(state, q, r, mix)
   }
   return(state)
 }
-#+end_src
 
-* Sub-Optimality Factor
-
-Computes the 'suboptimility factor' from Roberts and Rosenthal,
-$$\begin{aligned}
-b = d\frac{\sum \lambda_i^{-2}}{(\sum \lambda_i^{-1})^2 },
-\end{aligned}$$
-where $\lambda_{i}$ are the eigenvalues of $\mat C_i^{1/2}\mat\Sigma^{-1/2}$. 
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 sub_optim_factor <- function(sigma, sigma_j){
 
   # The paper suggests using these evals
@@ -184,11 +98,7 @@ sub_optim_factor <- function(sigma, sigma_j){
 
   return(b)
 }
-#+end_src
 
-The original Rrat code
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 Rrat<-function(x)
 {
   eigs<-eigen(x)$values
@@ -199,13 +109,7 @@ mhead <- function(M, n=5)
 {
   M[0:n,0:n]
 }
-#+end_src
 
-* Plotting
-
-Plots the trace of the first coordinate of the given sample, and saves it to a file.
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 plotter <- function(sample, filepath, d){
   
   y <- sapply(sample, function(i){i$x[d]})
@@ -219,16 +123,8 @@ plotter <- function(sample, filepath, d){
     labs(title = "Trace plot of the first coordinate in R")
 
   ggsave(filepath, plot = trace_plot, width = 590/96, height = 370/96, dpi = 96)
-}  
-#+end_src
+}
 
-* Compute Time vs. dimension
-
-** ~run_with_complexity~
-
-This runs the main loop with an extra duration output, so that speed tests can be run
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 run_with_complexity <- function(sigma_d){
 
   mix = FALSE
@@ -269,14 +165,8 @@ run_with_complexity <- function(sigma_d){
   
   return(c(n, thinrate, burnin, duration, b))
 }
-#+end_src
 
-** ~compute_time_graph~
-
-This goes through sub-matrices of ~sigma~ in order to make data detailing dimension against time, for plotting.
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
-compute_time_graph <- function(sigma, csv_file = "./data/R_compute_times_test.csv"){
+compute_time_graph <- function(sigma, csv_file = "./data/R_compute_times_v2_laptop_1.csv"){
 
   d = dim(sigma)[1]
   
@@ -293,13 +183,7 @@ compute_time_graph <- function(sigma, csv_file = "./data/R_compute_times_test.cs
   write.table(y, csv_file, sep = ",", col.names = FALSE, row.names = FALSE)
 
 }
-#+end_src
 
-* Get Sigma
-
-Some functions to read/generate target Variance matrices for use in the tests.
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 generate_sigma <- function(d) {
 
   M <- matrix(rnorm(d^2), nrow = d)
@@ -315,16 +199,7 @@ read_sigma <- function(d) {
   return(sigma[1:d,1:d])
   
 }
-  
-#+end_src
 
-* Mixing Tests
-
-The R implementation of this does not seem to work. For these tests, please see the JAX version of this code
-
-To test mixing, we compute ~b~ every 100 steps (reusing the thinning code) across a chain without burnin.
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 mixing_test <- function(sigma, n=10000, thinrate=1, mix = FALSE,
                         csvfile = "./data/R_mixing_test.csv") {
   
@@ -361,11 +236,7 @@ mixing_test <- function(sigma, n=10000, thinrate=1, mix = FALSE,
   write.table(b_vals, csvfile, sep = ",", col.names = FALSE, row.names = FALSE)
   
 }
-#+end_src
 
-* ~main~
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 main <- function(d=10, n=1000, thinrate=10, burnin=10000,
                  mix=FALSE, filepath="./Figures/trace_plot.png",
                  get_sigma = generate_sigma,
@@ -428,9 +299,6 @@ main <- function(d=10, n=1000, thinrate=10, burnin=10000,
   
   return(sample)
 }
-#+end_src
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
 
 checkwd <- function() {
   
@@ -449,4 +317,3 @@ checkwd <- function() {
   }
   
 }
-#+end_src

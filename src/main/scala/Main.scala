@@ -313,10 +313,10 @@ object AdaptiveMetropolis:
 
   @main def run(): Unit = {
     
-    //compute_time_graph(sigma_d, "data/scala_compute_times_laptop_1.csv")
+    compute_time_graph(read_sigma(100), "./data/scala_compute_times_laptop_1.csv")
 
-    main(file = "./Figures/adaptive_trace_JAX_d_10.png",
-         get_sigma = read_sigma)
+    //main(file = "./Figures/adaptive_trace_JAX_d_10.png",
+    //     get_sigma = read_sigma)
 
   }
 

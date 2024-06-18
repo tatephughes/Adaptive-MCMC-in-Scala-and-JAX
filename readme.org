@@ -214,6 +214,9 @@ with open('data/very_chaotic_variance.csv', 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerows(np.array(sigma))
 
+
+
+    
 'data/chaotic_variance.csv'
 #+end_src
 
@@ -233,53 +236,27 @@ library(patchwork)
 #+end_src
 
 #+begin_src R :session example :results output
-jax_times_laptop_32 <- cbind(1:100,read.csv("./data/JAX_compute_times_laptop_1.csv", header = FALSE)) %>%
+jax_times_laptop_32 <- cbind(1:100,read.csv("./data/JAX_32_compute_times_laptop_1.csv", header = FALSE)) %>%
   mutate(proc = "JAX32")
 names(jax_times_laptop_32) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-jax_times_laptop_64 <- cbind(1:100,read.csv("./data/JAX_64bit_compute_times_laptop_1.csv", header = FALSE)) %>%
+jax_times_laptop_64 <- cbind(1:100,read.csv("./data/JAX_64_compute_times_laptop_1.csv", header = FALSE)) %>%
   mutate(proc = "JAX64")
 names(jax_times_laptop_64) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-print(head(jax_times_laptop_1,3))
-#+end_src
-
-#+RESULTS:
-: d     n thinrate burnin      time        b  proc
-: 1 1 10000       10  1e+06 0.9886949 1.000000 JAX32
-: 2 2 10000       10  1e+06 1.1216428 1.000010 JAX32
-: 3 3 10000       10  1e+06 1.3367074 1.000016 JAX32
-
-#+begin_src R :session example :results output
 scala_times_laptop_1 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1.csv", header = FALSE)) %>%
   mutate(proc = "Scala")
 names(scala_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-print(head(scala_times_laptop_1,3))
-#+end_src
-
-#+RESULTS:
-: d     n thinrate  burnin     time        b  proc
-: 1 1 10000       10 1000000 2.475539 1.000000 Scala
-: 2 2 10000       10 1000000 2.623258 1.000080 Scala
-: 3 3 10000       10 1000000 2.978401 1.000217 Scala
-
-#+begin_src R :session example :results output
 r_times_laptop_1 <- cbind(1:80,read.csv("./data/R_compute_times_v2_laptop_1.csv", header = FALSE)) %>%
   mutate(proc = "R")
 names(r_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-print(head(r_times_laptop_1, 3))
 #+end_src
-
-#+RESULTS:
-: d     n thinrate burnin     time        b proc
-: 1 1 10000       10  1e+06 25.70118 1.000000    R
-: 2 2 10000       10  1e+06 32.07974 1.000023    R
-: 3 3 10000       10  1e+06 34.13313 1.000122    R
 
 We can now use ~ggplot~ to make a nice plot of this data.
 
 Putting the data together and plotting
 
 #+begin_src R :session example :results graphics file :file Figures/plot_complexity_laptop_1.png :width 1000 :exports both
-data <- rbind(jax_times_laptop_32, jax_times_laptop_64, scala_times_laptop_1, r_times_laptop_1)
+#data <- rbind(jax_times_laptop_32, jax_times_laptop_64, scala_times_laptop_1, r_times_laptop_1)
+data <- rbind(jax_times_laptop_32, jax_times_laptop_64, r_times_laptop_1)
 
 time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
@@ -294,6 +271,10 @@ print(time_graph)
 
 #+RESULTS:
 [[file:Figures/plot_complexity_laptop_1.png]]
+
+Scala was not properly re-ran yet!
+
+Also, the strange 64 bit behaviour in JAX has disappeared?
 
 We can also plot the final sub-optimality factor, $b$, over all the dimensions;
 
@@ -312,13 +293,15 @@ print(b_graph)
 #+RESULTS:
 [[file:Figures/plot_b_laptop.png]]
 
+It's not clear why there is a performance difference between R and JAX (again, the scala line should be ignored for now)
+
 We can see that while both perform equally as well, JAX maintains a good lead in terms of speed over both Scala and especially R.
 
 * Mixing
 
 This is the graph comparing the two versions of the algorithms' mixing capabilities (full description to be written)
 
-#+begin_src R :session example :results graphics file :file ~/RoamNotes/Figures/plot_mixing.png :height 600 :width 1200 :exports both
+#+begin_src R :session example :results graphics file :file ./Figures/plot_mixing.png :height 600 :width 1200 :exports both
 jax_b_mixing <- cbind(1:100,read.csv("./data/so_factor_mixing.csv", header = FALSE)) %>%
   mutate(proc = "Mixing")
 names(jax_b_mixing) <- c("j", "alsoj","b", "proc")
@@ -340,4 +323,4 @@ print(plot_mixing)
 #+end_src
 
 #+RESULTS:
-[[file:~/RoamNotes/Figures/plot_mixing.png]]
+[[file:./Figures/plot_mixing.png]]
