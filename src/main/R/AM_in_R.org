@@ -76,7 +76,7 @@ try_accept <- function(state, prop, alpha, mix){
     is_accepted <- 0
   }
 
-  x_mean_new <- (x_mean*(j-1) + x_new)/j
+  x_mean_new <- (x_mean*j + x_new)/(j+1)
 
   if (mix) {
     # without the epsilon bias

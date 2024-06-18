@@ -1,3 +1,4 @@
+//import com.github.fommil.netlib.BLAS
 import breeze.plot._
 import breeze.linalg._
 import breeze.numerics._
@@ -83,7 +84,7 @@ object AdaptiveMetropolis:
       }
 
       // Update mean and Covariance
-      val x_mean_new = ((j-1)*x_mean + x_new)/j
+      val x_mean_new = (j*x_mean + x_new)/(j+1)
       val prop_cov_new = {
         prop_cov*(j-1)/j +
           (j * (x_mean * x_mean.t) -
@@ -313,10 +314,10 @@ object AdaptiveMetropolis:
 
   @main def run(): Unit = {
     
-    compute_time_graph(read_sigma(100), "./data/scala_compute_times_laptop_1.csv")
+    //compute_time_graph(read_sigma(100), "./data/scala_compute_times_laptop_1.csv")
 
-    //main(file = "./Figures/adaptive_trace_JAX_d_10.png",
-    //     get_sigma = read_sigma)
+    main(file = "./Figures/adaptive_trace_JAX_d_10.png",
+         get_sigma = read_sigma)
 
   }
 

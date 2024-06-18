@@ -41,17 +41,21 @@ def try_accept(state, prop, alpha, mix, key):
                                0, lambda _: (prop, 1),
                                0, lambda _: (x, 0))
 
-  x_mean_new = x_mean*(j-1)/j  + x_new/j
+  x_mean_new = x_mean*j/(j+1)  + x_new/(j+1)
+  #small change to mean, used to be biased
 
-  prop_cov_new = jnp.select(condlist   = [mix, not mix],
+  prop_cov_new = jnp.select(condlist   = [mix | (j<2*d), (not mix) & (j>=2*d)],
                             choicelist = [
-                              prop_cov*((j-1)/j) # this isn't good for float computation, maybe?
-                              + (jnp.outer(x-x_mean, x-x_mean_new))*5.6644/(j*d),
                               prop_cov*((j-1)/j)
-                              + (j*jnp.outer(x_mean,x_mean) -
-                                 (j+1)*jnp.outer(x_mean_new,x_mean_new) +
-                                 jnp.outer(x_new,x_new) +
-                                 0.01*jnp.identity(d)
+                              + (j*jnp.outer(x_mean,x_mean)
+                              - (j+1)*jnp.outer(x_mean_new,x_mean_new)
+                              + jnp.outer(x_new,x_new)
+                                 )*5.6644/(j*d),
+                              prop_cov*((j-1)/j)
+                              + (j*jnp.outer(x_mean,x_mean)
+                              - (j+1)*jnp.outer(x_mean_new,x_mean_new)
+                              + jnp.outer(x_new,x_new)
+                              + 0.01*jnp.identity(d)
                                  )*5.6644/(j*d)],
                             default = 1)
 
@@ -250,15 +254,15 @@ def read_sigma(d, file_path = './data/chaotic_variance.csv'):
 
 def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_test.csv"):
     
-    sigma = get_sigma(d=10)
+    sigma = get_sigma(d=100)
     Q, R = qr(sigma) # take the QR decomposition of sigma
     d = sigma.shape[0]
     
-    n = 100
+    n = 100000
 
     key = jax.random.PRNGKey(seed=1)
 
-    sample = main(d=d, n=n, thinrate=20000, burnin=0,
+    sample = main(d=d, n=n, thinrate=100, burnin=0,
                   file = "./Figures/adaptive_trace_JAX_mixing.png",
                   mix=mix, get_sigma=lambda d:sigma[0:d,0:d])
 
