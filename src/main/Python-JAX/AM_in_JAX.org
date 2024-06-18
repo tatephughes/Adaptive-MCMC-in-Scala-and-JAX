@@ -614,8 +614,8 @@ def main(d=10, n=1000, thinrate=10, burnin=10000,
     b1 = sub_optim_factor(sigma, jnp.identity(d))
     b2 = sub_optim_factor(sigma,sigma_j)
 
-    print(f"The optimal sampling value of x_1 is {sigma[0,0] * (5.6644/d)}")
-    print(f"The actual sampling value of x_1 is  {sigma_j[0,0] * (5.6644/d)}")
+    print(f"The optimal sampling variance of x_1 is {sigma[0,0] * (5.6644/d)}")
+    print(f"The actual sampling variance of x_1 is  {sigma_j[0,0] * (5.6644/d)}")
     print(f"The initial b value is {b1}")
     print(f"The final b value is {b2}")
     print(f"The acceptance rate is {acc_rate}")
@@ -646,11 +646,13 @@ if __name__ == "__main__":
     
     #sample = main(file = "./Figures/adaptive_trace_JAX_test.png", mix = True, get_sigma=read_sigma)
 
-    compute_time_graph(read_sigma(d=10), "data/JAX_64bit_compute_times_laptop_test.csv")
+    #compute_time_graph(read_sigma(d=10), "data/JAX_64bit_compute_times_laptop_test.csv")
     #mixing_test(read_sigma, mix=True,
     #            csvfile = "./data/so_factor_mixing.csv")
     #mixing_test(read_sigma, mix=False,
     #            csvfile = "./data/so_factor_not_mixing.csv")
+
+    main(d=100, n=1000, thinrate=1000, burnin=0, mix=True)
 
 #+end_src
 

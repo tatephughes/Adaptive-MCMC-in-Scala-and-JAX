@@ -301,8 +301,8 @@ object AdaptiveMetropolis:
     val b1 = sub_optim_factor(sigma, DenseMatrix.eye(d))
     val b2 = sub_optim_factor(sigma, sigma_j)
 
-    print("\nThe optimal sampling value of x_1 is " + (5.6644/d) * sigma(0,0))
-    print("\nThe actual sampling value of x_1 is  " + sigma_j(0,0))
+    print("\nThe optimal sampling variance of x_1 is " + (5.6644/d) * sigma(0,0))
+    print("\nThe actual sampling variance of x_1 is  " + sigma_j(0,0))
     print("\nThe initial b value is " + b1)
     print("\nThe final b value is " + b2)
     print("\nThe acceptance rate is " + acc_rate)
