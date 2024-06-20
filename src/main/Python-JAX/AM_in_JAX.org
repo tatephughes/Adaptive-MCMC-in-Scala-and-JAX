@@ -49,6 +49,7 @@ import jax.numpy as jnp
 import jax.lax as jl
 import jax.random as rand
 from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
+from jax.scipy.linalg import solve_triangular
 import time
 from AM_in_JAX_tests import *
 import csv
@@ -133,31 +134,28 @@ def try_accept(state, prop, alpha, mix, key):
                                0, lambda _: (prop, 1),
                                0, lambda _: (x, 0))
 
-  x_mean_new = x_mean*j/(j+1)  + x_new/(j+1)
-  #small change to mean, used to be biased
+  # update empirical mean
+  x_mean_new = (x_mean*j + x_new)/(j+1)
 
+  # update proposal covariance
   prop_cov_new = jnp.select(condlist   = [mix | (j<2*d), (not mix) & (j>=2*d)],
                             choicelist = [
                               prop_cov*((j-1)/j)
-                              + (j*jnp.outer(x_mean,x_mean)
-                              - (j+1)*jnp.outer(x_mean_new,x_mean_new)
-                              + jnp.outer(x_new,x_new)
+                              + (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new)
+                              + jnp.outer(x_new - x_mean_new, x_new - x_mean_new)
                                  )*5.6644/(j*d),
                               prop_cov*((j-1)/j)
-                              + (j*jnp.outer(x_mean,x_mean)
-                              - (j+1)*jnp.outer(x_mean_new,x_mean_new)
-                              + jnp.outer(x_new,x_new)
+                              + (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new)
+                              + jnp.outer(x_new - x_mean_new, x_new - x_mean_new)
                               + 0.01*jnp.identity(d)
                                  )*5.6644/(j*d)],
                             default = 1)
-
-  # NOTE: seems inefficient to construct a diagonal identity matrix like this, I would imagine there is a better way to do this
   
   return((j + 1,
           x_new,
           x_mean_new,
           prop_cov_new,
-          accept_count+is_accepted))
+          accept_count + is_accepted))
 #+end_src
 
 *** ~test_try_accept~ [OUT OF DATE]
@@ -253,15 +251,15 @@ def adapt_step(state, q, r, mix, key):
     
     keys = rand.split(key,3)
 
-    prop = jl.cond((j <= 2*d) | (mix & (rand.uniform(keys[0]) < 0.01)),
-                   lambda key: rand.normal(key, shape=(d,))/(100*d) + x, # 'Safe' sampler
+    prop = jl.cond((j <= 2*d) | (mix & (rand.uniform(keys[0]) < 0.05)),
+                   lambda key: rand.normal(key, shape=(d,))/(jnp.sqrt(100*d)) + x, # 'Safe' sampler
                    lambda key: rand.multivariate_normal(key, x, prop_cov), # 'Adaptive' sampler
                    keys[1])
     
-    # Compute the log Hastings ratio///
+    # Compute the log Hastings ratio
     alpha = 0.5 * (x.T @ (solve(r, q.T @ x))
                    - (prop.T @ solve(r, q.T @ prop)))
-
+                   
     return(try_accept(state, prop, alpha, mix, keys[2]))
 #+end_src
 
@@ -523,9 +521,9 @@ def generate_sigma(d):
 
     key = jax.random.PRNGKey(seed=1)
     M = rand.normal(key, shape = (d,d))
-    return M @ M.T
+    return inv(M @ M.T)
 
-def read_sigma(d, file_path = './data/chaotic_variance.csv'):
+def read_sigma(d, file_path = './data/very_chaotic_variance.csv'):
 
     matrix = []
     with open(file_path, 'r', newline='') as file:
@@ -546,11 +544,11 @@ def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_te
     Q, R = qr(sigma) # take the QR decomposition of sigma
     d = sigma.shape[0]
     
-    n = 100000
+    n = 100
 
     key = jax.random.PRNGKey(seed=1)
 
-    sample = main(d=d, n=n, thinrate=100, burnin=0,
+    sample = main(d=d, n=n, thinrate=10000, burnin=0,
                   file = "./Figures/adaptive_trace_JAX_mixing.png",
                   mix=mix, get_sigma=lambda d:sigma[0:d,0:d])
 
@@ -574,10 +572,10 @@ def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_te
 Due to memory constraints and garbage collection not being quite as magical, we do burn-in seperately to the main sampling.
 
 #+begin_src python :session example :results none
-def main(d=10, n=1000, thinrate=10, burnin=10000,
+def main(d=10, n=1000, thinrate=1000, burnin=0,
          file="./Figures/adaptive_trace_JAX_test.png",
          mix = False,
-         get_sigma = generate_sigma):
+         get_sigma = read_sigma):
 
     """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.I
     """
@@ -656,7 +654,7 @@ if __name__ == "__main__":
     #mixing_test(read_sigma, mix=False,
     #            csvfile = "./data/so_factor_not_mixing.csv")
 
-    main(d=100, n=1000, thinrate=1000, burnin=0, mix=True)
+    sample = main(d=10, n=1000, thinrate=1000, burnin=0, mix=False)
 
 #+end_src
 

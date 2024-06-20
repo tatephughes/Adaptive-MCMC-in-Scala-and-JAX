@@ -1,5 +1,48 @@
-#!/usr/bin/env python3
+#+TITLE: AM in Python-JAX
 
+:BOILERPLATE:
+#+PROPERTY: header-args :tangle AM_in_JAX.py
+#+BIBLIOGRAPHY: Bibliography.bib
+#+LATEX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [letterpaper]
+#+OPTIONS: toc:nil
+#+LATEX_HEADER: \usepackage{amsmath,amsfonts,amsthm,amssymb,bm,bbm,tikz,tkz-graph}
+#+LATEX_HEADER: \usetikzlibrary{arrows}
+#+LATEX_HEADER: \usetikzlibrary{bayesnet}
+#+LATEX_HEADER: \usetikzlibrary{matrix}
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
+#+LATEX_HEADER: \usepackage[english]{babel}
+#+LATEX_HEADER: \newtheorem{theorem}{Theorem}[section]
+#+LATEX_HEADER: \newtheorem{corollary}[theorem]{Corollary}
+#+LATEX_HEADER: \newtheorem{lemma}[theorem]{Lemma}
+#+LATEX_HEADER: \newtheorem{definition}[theorem]{Definition}
+#+LATEX_HEADER: \newtheorem*{remark}{Remark}
+#+LATEX_HEADER: \DeclareMathOperator{\E}{\mathbb E}}
+#+LATEX_HEADER: \DeclareMathOperator{\prob}{\mathbb P}
+#+LATEX_HEADER: \DeclareMathOperator{\var}{\mathbb V\mathrm{ar}}
+#+LATEX_HEADER: \DeclareMathOperator{\cov}{\mathbb C\mathrm{ov}}
+#+LATEX_HEADER: \DeclareMathOperator{\cor}{\mathbb C\mathrm{or}}
+#+LATEX_HEADER: \DeclareMathOperator{\normal}{\mathcal N}
+#+LATEX_HEADER: \DeclareMathOperator{\invgam}{\mathcal{IG}}
+#+LATEX_HEADER: \newcommand*{\mat}[1]{\bm{#1}}
+#+LATEX_HEADER: \newcommand{\norm}[1]{\left\Vert #1 \right\Vert}
+#+LATEX_HEADER: \renewcommand*{\vec}[1]{\boldsymbol{\mathbf{#1}}}
+#+EXPORT_EXCLUDE_TAGS: noexport
+:END:
+
+This file _is_ the source code; everything below gets 'tangled' into ~AM_in_JAX.py~.
+
+* Boilerplate
+
+** Shabang
+
+#+begin_src python :session example :results none
+#!/usr/bin/env python3
+#+end_src
+
+** Imports
+
+#+begin_src python :session example :results none
 import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
@@ -12,9 +55,58 @@ from AM_in_JAX_tests import *
 import csv
 import os
 import re
+#+end_src
 
+** Test Imports
+
+The test functions are out-of-date and no longer functional
+
+*************** TODO [#C] Update the tests for AM in JAX :projects:
+*************** END
+
+#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
+import matplotlib.pyplot as plt
+import jax.numpy as jnp
+import jax.lax as jl
+import jax.random as rand
+import jax.scipy.stats as stat
+from jax import vmap
+from jax.numpy.linalg import solve, qr, norm, eig, inv, cholesky
+import jax
+import time
+from AM_in_JAX import *
+#+end_src
+
+** Enable (disable) 64-bit precision
+
+This significantly slows the code on most GPUs.
+
++Without this however, the precision is not enough at higher dimensions.+
+With the new method of computing and updating the covariance matrix, this may no longer need to be used. 
+
+#+begin_src python :session example :results none
 jax.config.update('jax_enable_x64', False)
+#+end_src
 
+64 bit might still be necessary for very large unthinned samples.
+
+* Core Functions
+
+Let's assume that the ~state~ is a tuple with four elements, instead of it's own class. JAX reads this as a PyTree, which it is happy to preform operations on (which wouldn't be the case if I made ~state~ a class like in the Scala version)
+
+More specificaly, ~state = (j, x, x_mean, prop_cov)~.
+
+** ~try_accept~
+
+This function takes a state, a proposed move, and a log probabilty, and returns the next state, using the probability as expected.
+f
+It outputs the next state, updating the mean and covariance by
+\begin{align*}
+\vec{\overline{X}}_t &= \frac{t-1}{t} \vec{\overline{X}}_{t-1} + \frac{1}{t} \vec X_t, \\
+\mat C_{t+1} &= \frac{t-1}{t} \mat C_t + \frac{s_d}{t}(t\vec{\overline{X}}_{t-1}\vec{\overline{X}}_{t-1}^{\intercal} - (t+1)\vec{\overline{X}}_t\vec{\overline{X}}_t^{\intercal} + \vec X_t\vec X_t^{\intercal} + \epsilon \mat I_d),\quad t\geq t_0.
+\end{align*}
+
+#+begin_src python :session example :results none
 def try_accept(state, prop, alpha, mix, key):
 
   """ Accepts a proposed move from ~state~ with probability ~exp(min(0,alpha))~
@@ -64,7 +156,83 @@ def try_accept(state, prop, alpha, mix, key):
           x_mean_new,
           prop_cov_new,
           accept_count + is_accepted))
+#+end_src
 
+*** ~test_try_accept~ [OUT OF DATE]
+
+The below code block does a few tests on the ~try_accept~ function. If the tests pass, it will return ~True~, otherwise it will throw an error.
+
+#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
+def test_try_accept():
+    
+    d = 10
+    key = jax.random.PRNGKey(seed=2)
+    keys = rand.split(key,10000)
+    state0 = (0, jnp.zeros(10), jnp.zeros(10), jnp.identity(10), False)
+    prop = jnp.ones(10)
+    
+    '''
+    Test 1:
+    if alpha=log(0.5), then the function should accept approx. 50% of the proposals
+    '''
+    assert jnp.abs(jnp.mean(jl.map(lambda x: try_accept(state0, prop, jnp.log(0.5), x), keys)[4]) - 0.5 < 0.1), "Accepting at unexpected rate"
+
+    '''
+    Test 1.5:
+    if alpha=-0.33333333, then the function should accept approx. 0.7165 of the proposals
+    '''
+    assert jnp.abs(jnp.mean(jl.map(lambda x: try_accept(state0, prop, -0.3333333, x), keys)[4]) - 0.7165 < 0.1), "Accepting at unexpected rate"
+
+    '''
+    Test 2:
+    if alpha=log(0)=-inf, then the function should never accept, and should return the
+    proposed value
+    '''
+    assert jnp.all(try_accept(state0, prop, jnp.log(0), key)[1]==jnp.zeros(10)), "Not rejecting proposal"
+
+    '''
+    Test 3:
+    if alpha=log(1)=0 then the function should always accept, and should return the
+    proposed value
+    '''
+    assert jnp.all(try_accept(state0, prop, jnp.log(1), key)[1]==prop), "Not accepting proposal"
+
+    '''
+    Test 4:
+    No matter what, j should increment by exactly 1
+    '''
+    assert jnp.all(jl.map(lambda x: try_accept(state0, prop, jnp.log(0.5), x), keys)[0]==1), "Index not correctly implemented"
+
+    '''
+    Test 5:
+    When it accepts, the x_sum should increase accordingly
+    '''
+    assert jnp.all(try_accept(state0, prop, jnp.log(1), key)[2]==prop), "Not increased x_sum"
+    assert jnp.all(try_accept(state0, prop, jnp.log(0), key)[2]==jnp.zeros(10)), "Not increased x_sum"
+
+    '''
+    Test 6:
+    When it accepts, the xxt_sum should increase accordingly
+    '''
+    assert jnp.all(try_accept(state0, prop, jnp.log(1), key)[3]==jnp.identity(10) + jnp.outer(prop, prop)), "Not increased xxt_sum"
+    assert jnp.all(try_accept(state0, prop, jnp.log(0), key)[3]==jnp.identity(10)), "Not increased xxt_sum"
+
+    return True
+#+end_src
+
+** ~adapt_step~
+
+This samples from the proposal distribution and computes the Hastings ratio;
+\begin{align*}
+q(\vec X_t^* \mid \vec X_0, \dots, X_{t-1}) \sim \mathcal N_d (\vec X_{t-1}, \mat C_t),
+\end{align*}
+
+with Hastings Ratio
+\begin{align*}
+\alpha = \frac12 \left[ \vec x^{\intercal} \mat \Sigma^{-1} \vec x - \vec x^{*\intercal} \mat \Sigma^{-1}\vec x^{*}\right].
+\end{align*}
+
+#+begin_src python :session example :results none
 def adapt_step(state, q, r, mix, key):
 
     """ Samples from the current proposal distribution and computes the log Hastings Ratio, and returns the next state according to ~try_accept~
@@ -93,7 +261,42 @@ def adapt_step(state, q, r, mix, key):
                    - (prop.T @ solve(r, q.T @ prop)))
                    
     return(try_accept(state, prop, alpha, mix, keys[2]))
+#+end_src
 
+*** ~test_adapt_step~ [OUT OF DATE]
+
+#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
+def test_adapt_step():
+
+    d = 2
+    n = 100000
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    # this state was chosen being close to an actual state of the adaptive chain
+    state = (100, jnp.zeros(2), jnp.array([-80.0,-5.0]), jnp.array([[260.0,100.0],[100.0,150.0]]), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+    
+    '''
+    Test 1:
+    From a (hypothetical) progressed point, the result should be approximately distributed with a N(0,sigma) distribution.
+    '''
+    def step(carry, _):
+        nextstate = adapt_step(carry, Q, R, keys[carry[0]])[0]
+        return(nextstate, nextstate)
+    
+    assert norm(cov(jl.scan(step, state, jnp.zeros(n))[1][1]) - sigma) < 0.2, "adap_step not producing sample sufficiently close to the target distribution"
+
+    
+    return True
+#+end_src
+
+
+*** Covariance function
+
+Since there isn't one built-in anywhere as far as I can tell, this is a simple function to compute the covariance matrix of a sample.
+
+#+begin_src python :session example :results none
 def cov(sample):
     
     means = jnp.mean(sample, axis=1)
@@ -109,7 +312,13 @@ def cov(sample):
 def mhead(M, n=3):
 
     return M[0:n,0:n]
+#+end_src
 
+** ~thinned_step~
+
+ ~thinned_step~ uses a fori_loop to 'jump' steps, which JAX knows how to garbage collect. This is especially important for high dimensional samples.
+
+#+begin_src python :session example :results none
 def thinned_step(thinrate, state, q, r, mix, key):
 
     """Performs ~thinrate~ iterations of adapt_step, withour saving the intermiade steps"""
@@ -118,7 +327,48 @@ def thinned_step(thinrate, state, q, r, mix, key):
 
     # I think this should scan over the keys!
     return jl.fori_loop(0, thinrate, (lambda i, x: adapt_step(x, q, r, mix, keys[i])), state)
+#+end_src
 
+*** ~test_thinned_step~
+
+#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
+def test_thinned_step():
+
+    d = 2
+    n = 1000
+    thinrate = 10
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    # this state was chosen being close to an actual state of the adaptive chain
+    state = (100, jnp.zeros(2), jnp.array([-80.0,-5.0]), jnp.array([[260.0,100.0],[100.0,150.0]]), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+    
+    '''
+    Test 1:
+    the index of a state should increase by thinrate
+    '''
+    assert (thinned_step(thinrate, state, Q, R, keys[0])[0] == 100+thinrate), "thinned_step not correctly incrementing step count"
+
+    return True
+  
+#+end_src
+
+* Sub-Optimality Factor
+
+Computes the 'suboptimility factor' from Roberts and Rosenthal,
+$$\begin{aligned}
+b = d\frac{\sum \lambda_i^{-2}}{(\sum \lambda_i^{-1})^2 },
+\end{aligned}$$
+where $\lamba_{i}$ are the eigenvalues of $\mat C_i^{1/2}\mat\Sigma^{-1/2}$ Currently , this is only used on the sample covariance of the generated chain, which is not how it is mean to be used. It is meant to be applied to the sampling covariance within the chain. It is also inefficient currently, and could be improved using a change of coordinate to use ~eigh~ instead of ~eig~, which would also allow it to work on GPU.
+
+*************** TODO Fix the eigenvalue computation with a change of coordinate :projects:
+*************** TODO Compute b on the sampling covariance, not the sample covariance :projects:
+*************** END
+
+I'm convinced that this is not computing the sub-optimality correctly.
+
+#+begin_src python :session example :results none
 def sub_optim_factor(sigma, sigma_j):
 
     """Computes the sub-optimality factor between the true target covariance ~sigma~ and the sampling covariance ~sigma_j~, from Roberts and Rosethal
@@ -151,13 +401,24 @@ def sub_optim_factor(sigma, sigma_j):
     b = (d * sum(lam**-2) / sum(lam**-1)**2).real
 
     return b
+#+end_src
 
+#+begin_src python :session example :results output
 def mat_sqrt(M):
 
     M_decomp = eig(M) # doesn't take advantage of the matrix properties!
 
     return M_decomp[1] @ jnp.diag(jnp.sqrt(M_decomp[0])) @ inv(M_decomp[1])
+    
+#+end_src
 
+#+RESULTS:
+
+* Plotting
+
+Plots the trace of the first coordinate of the given sample, and saves it to a file.
+
+#+begin_src python :session example :results none
 def plot_trace(sample, file_path, j=0):
 
     """Plots a trace plot of the jth coordinate of the given array of states,
@@ -172,6 +433,15 @@ def plot_trace(sample, file_path, j=0):
     plt.grid(True)
     plt.savefig(file_path, dpi=96)
 
+#+end_src
+
+* Compute time vs. dimension
+
+** ~run_with_complexity~
+
+This runs the main loop with an extra duration output, so that speed tests can be run
+
+#+begin_src python :session example :results none
 def run_with_complexity(sigma_d, key):
 
     """Runs the main loop on a given target Covariance, and gets the time the main loop took.
@@ -215,7 +485,13 @@ def run_with_complexity(sigma_d, key):
     b = sub_optim_factor(sigma_d,sigma_j)
 
     return n, thinrate, burnin, duration, float(b) # making it into a normal float for readability
+#+end_src
 
+** ~compute_time_graph~
+
+This goes through sub-matrices of ~sigma~ in order to make data detailing dimension against time, for plotting.
+
+#+begin_src python :session example :results none
 def compute_time_graph(sigma, csv_file="./data/JAX_compute_times_test.csv", is_64_bit=False):
 
     """Loop through all the primary minors of ~sigma~ and runs the complexity test on each of them, saving the result to ~csv_file~
@@ -234,7 +510,13 @@ def compute_time_graph(sigma, csv_file="./data/JAX_compute_times_test.csv", is_6
     with open(csv_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(y)
+#+end_src
 
+* Get Sigma
+
+Some functions to read/generate target Variance matrices for use in the tests.
+
+#+begin_src python :session example :results none
 def generate_sigma(d):
 
     key = jax.random.PRNGKey(seed=1)
@@ -249,7 +531,13 @@ def read_sigma(d, file_path = './data/very_chaotic_variance.csv'):
         for row in reader:
             matrix.append([float(item) for item in row])
     return jnp.array(matrix)[0:d,0:d]
+#+end_src
 
+* Mixing Tests
+
+To test mixing speed, we can compute ~b~ across entire un-thinned chains without burn-in.
+
+#+begin_src python :session example :results none
 def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_test.csv"):
     
     sigma = get_sigma(d=100)
@@ -277,6 +565,13 @@ def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_te
         writer = csv.writer(csvfile)
         writer.writerows(y)
 
+#+end_src
+
+* ~main~
+
+Due to memory constraints and garbage collection not being quite as magical, we do burn-in seperately to the main sampling.
+
+#+begin_src python :session example :results none
 def main(d=10, n=1000, thinrate=1000, burnin=0,
          file="./Figures/adaptive_trace_JAX_test.png",
          mix = False,
@@ -333,6 +628,11 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
     
     return am_sample
 
+#+end_src
+
+The entry point for if the code is run in a console.
+
+#+begin_src python :session example :results graphics file output :file ../../../Figures/adaptive_trace_jax.png :height 200
 if __name__ == "__main__":
 
     # This code checks wether the working directory is correct, and if not, attemps
@@ -354,4 +654,9 @@ if __name__ == "__main__":
     #mixing_test(read_sigma, mix=False,
     #            csvfile = "./data/so_factor_not_mixing.csv")
 
-    sample = main(d=10, n=1000, thinrate=1000, burnin=0, mix=False)
+    #sample = main(d=10, n=1000, thinrate=1000, burnin=0, mix=False)
+
+#+end_src
+
+#+RESULTS:
+[[file:../../../Figures/adaptive_trace_jax.png]]

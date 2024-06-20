@@ -23,8 +23,9 @@ case class AM_state(j: Double,
 )
 
 extension[T](ll: LazyList[T]){
-  // Extension of the LazyList class for chain thinning, done in a memory-efficient way
-  // updated from Darren's scala course as an extension, github.com/darrenjw/scala-course
+  /* Extension of the LazyList class for chain thinning, done in a memory-efficient way
+   updated from Darren's scala course as an extension, github.com/darrenjw/scala-course
+   */ 
   def thin(th: Int): LazyList[T] = {
     val lld = ll.drop(th - 1)
     if (lld.isEmpty) LazyList.empty else
@@ -85,11 +86,14 @@ object AdaptiveMetropolis:
 
       // Update mean and Covariance
       val x_mean_new = (j*x_mean + x_new)/(j+1)
-      val prop_cov_new = {
+      val prop_cov_new = if (j < 2*d) {
         prop_cov*(j-1)/j +
-          (j * (x_mean * x_mean.t) -
-          (j+1)*(x_mean_new * x_mean_new.t) +
-          (x_new * x_new.t) +
+          (j * ((x_mean-x_mean_new) * (x_mean-x_mean_new).t) +
+          ((x_new-x_mean_new) * (x_new-x_mean_new).t)) * 5.6644/(j*d)
+      } else {
+        prop_cov*(j-1)/j +
+          (j * ((x_mean-x_mean_new) * (x_mean-x_mean_new).t) +
+          ((x_new-x_mean_new) * (x_new-x_mean_new).t) +
             0.01*(DenseMatrix.eye[Double](d))) * 5.6644/(j*d)
       }
 
@@ -127,7 +131,7 @@ object AdaptiveMetropolis:
       // 'Safe' sampler
       // NOTE: I would imagine there is a more appropriate univariate
       // Gaussian sampler for this purpose
-      MultivariateGaussian(x, (0.01/d)*DenseMatrix.eye[Double](d)).draw()
+      MultivariateGaussian(x, (0.1/sqrt(d))*DenseMatrix.eye[Double](d)).draw()
     } else {
       // 'Adaptive' sampler
       MultivariateGaussian(x, prop_cov).draw()
@@ -254,7 +258,7 @@ object AdaptiveMetropolis:
   def read_sigma(d: Int): dm = {
 
     // Read the file lines, skipping empty lines
-    val lines = Source.fromFile("./data/chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
+    val lines = Source.fromFile("./data/very_chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
 
     // Assuming the CSV is well-formed and every row has the same number of columns
     val data = lines.map(_.split(",").map(_.toDouble))
@@ -271,9 +275,9 @@ object AdaptiveMetropolis:
   }
 
   def main(d: Int = 10,
-    n: Int = 1000, thinrate: Int = 10,
-    burnin: Int = 10000, file: String = "./Figures/adaptive_trace_Scala.png",
-    get_sigma: Int => dm = generate_sigma ): Unit = {
+    n: Int = 1000, thinrate: Int = 1000,
+    burnin: Int = 0, file: String = "./Figures/adaptive_trace_Scala.png",
+    get_sigma: (Int => dm) = generate_sigma): Unit = {
 
     // initial state
     val state0 = AM_state(1.0,
@@ -312,7 +316,7 @@ object AdaptiveMetropolis:
     plot_trace(am_sample.map(_.x), "./Figures/adaptive_trace_scala_d_10.png")
   }
 
-  @main def run(): Unit = {
+  @main def simple_run(): Unit = {
     
     //compute_time_graph(read_sigma(100), "./data/scala_compute_times_laptop_1.csv")
 
@@ -321,4 +325,8 @@ object AdaptiveMetropolis:
 
   }
 
-    
+  @main def complexity_run(): Unit = {
+
+    compute_time_graph(read_sigma(50), "./data/scala_compute_times_laptop_1_d50.csv")
+
+  }

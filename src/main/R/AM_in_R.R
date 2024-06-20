@@ -23,30 +23,22 @@ try_accept <- function(state, prop, alpha, mix){
     is_accepted <- 0
   }
 
-  x_mean_new <- (x_mean*(j-1) + x_new)/j
+  x_mean_new <- (x_mean*j + x_new)/(j+1)
 
-  if (mix) {
-    # without the epsilon bias
+  if (mix | j < 2*d) {
+                                        # without the bias
     prop_cov_new <- prop_cov*(j-1)/j +
-      (j*tcrossprod(x_mean, x_mean) -
-       (j+1)*tcrossprod(x_mean_new, x_mean_new) +
-       tcrossprod(x_new, x_new))*5.6644/(j*d)
-    #print(j)
-    #print(mhead(j*tcrossprod(x_mean, x_mean) -
-    #   (j+1)*tcrossprod(x_mean_new, x_mean_new) +
-    #   tcrossprod(x_new, x_new)))
-    #print(mhead(prop_cov_new))
-    #print("hello!")
-    #print(mhead(prop_cov_new))
-    #print(chol(prop_cov_new))
+      (j*tcrossprod(x_mean-x_mean_new, x_mean-x_mean_new) +
+       tcrossprod(x_new - x_mean_new, x_new - x_mean_new)
+      )*5.6644/(j*d)
   } else {
-    # with the epsilon bias
+                                        # with the bias
     prop_cov_new <- prop_cov*(j-1)/j +
-      (j*tcrossprod(x_mean, x_mean) -
-       (j+1)*tcrossprod(x_mean_new, x_mean_new) +
-       tcrossprod(x_new, x_new) + 0.01*diag(d))*5.6644/(j*d)
+      (j*tcrossprod(x_mean-x_mean_new, x_mean-x_mean_new) +
+       tcrossprod(x_new - x_mean_new, x_new - x_mean_new) +
+       0.01*diag(d)
+      )*5.6644/(j*d)
   }
-  
   
   return(list(j = j + 1,
               x = x_new,
@@ -57,26 +49,22 @@ try_accept <- function(state, prop, alpha, mix){
 
 adapt_step <- function(state, q, r, mix){
 
-    j        = state$j
-    x        = state$x
-    prop_cov = state$prop_cov
-    d        = length(x)
-  
-    if (j > 2*d && (!mix)) {
-      prop <- rmvn(1, x, prop_cov)[1,]
-      #prop <- mvrnorm(1, x, prop_cov)[1,]
-    } else if ((j <= 2*d) || (runif(1) > 0.05)){
-      prop <- rnorm(d)/(100*d) + x
-    } else {
-      prop <- rmvn(1, x, prop_cov)[1,]
-      #prop <- mvrnorm(1, x, prop_cov)[1,]
-    }
+  j        = state$j
+  x        = state$x
+  prop_cov = state$prop_cov
+  d        = length(x)
 
-    # Compute the log acceptance probability
-    alpha = 0.5 * (t(x) %*% (solve(r, t(q) %*% x))
-                   - (t(prop) %*% solve(r, t(q) %*% prop)))
-    
-    return(try_accept(state, prop, alpha, mix))
+  if (j <= 2*d || (mix && (runif(1) < 0.05))) {
+    prop <- rnorm(d)/sqrt(100*d) + x
+  } else {
+    prop <- rmvn(1, x, prop_cov)[1,]
+  }
+  
+                                        # Compute the log acceptance probability
+  alpha = 0.5 * (t(x) %*% (backsolve(r, t(q) %*% x))
+    - (t(prop) %*% backsolve(r, t(q) %*% prop)))
+  
+  return(try_accept(state, prop, alpha, mix))
 }
 
 thinned_step <- function(thinrate, state, q, r, mix){
@@ -166,7 +154,7 @@ run_with_complexity <- function(sigma_d){
   return(c(n, thinrate, burnin, duration, b))
 }
 
-compute_time_graph <- function(sigma, csv_file = "./data/R_compute_times_v2_laptop_1.csv"){
+compute_time_graph <- function(sigma, csv_file = "./data/R_compute_times_test.csv"){
 
   d = dim(sigma)[1]
   
@@ -194,7 +182,7 @@ generate_sigma <- function(d) {
 
 read_sigma <- function(d) {
 
-  sigma <- as.matrix(read.csv("./data/chaotic_variance.csv", header = FALSE))[1:d,1:d]  
+  sigma <- as.matrix(read.csv("./data/very_chaotic_variance.csv", header = FALSE))[1:d,1:d]  
 
   return(sigma[1:d,1:d])
   
@@ -237,9 +225,9 @@ mixing_test <- function(sigma, n=10000, thinrate=1, mix = FALSE,
   
 }
 
-main <- function(d=10, n=1000, thinrate=10, burnin=10000,
+main <- function(d=10, n=1000, thinrate=1000, burnin=0,
                  mix=FALSE, filepath="./Figures/trace_plot.png",
-                 get_sigma = generate_sigma,
+                 get_sigma = read_sigma,
                  prog=FALSE){
 
   numits <- n*thinrate + burnin
@@ -278,10 +266,7 @@ main <- function(d=10, n=1000, thinrate=10, burnin=10000,
   
   end_time <- Sys.time()
   duration <- difftime(end_time, start_time, units="secs")
-
-  #sigma_j <- cov(do.call(rbind,
-  #                       lapply(sample, function(y){y$x})))
-
+  
   sigma_j <- sample[[n]]$prop_cov / (5.6644/d)
   acc_rate <- sample[[n]]$accept_count / (n*thinrate + burnin)
   

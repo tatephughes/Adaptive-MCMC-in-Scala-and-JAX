@@ -236,27 +236,29 @@ library(patchwork)
 #+end_src
 
 #+begin_src R :session example :results output
-jax_times_laptop_32 <- cbind(1:100,read.csv("./data/JAX_32_compute_times_laptop_1.csv", header = FALSE)) %>%
+jax_times_laptop_32 <- cbind(1:50,read.csv("./data/JAX_32_compute_times_laptop_1_d50.csv", header = FALSE)) %>%
   mutate(proc = "JAX32")
 names(jax_times_laptop_32) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-jax_times_laptop_64 <- cbind(1:100,read.csv("./data/JAX_64_compute_times_laptop_1.csv", header = FALSE)) %>%
+jax_times_laptop_64 <- cbind(1:50,read.csv("./data/JAX_64_compute_times_laptop_1_d50.csv", header = FALSE)) %>%
   mutate(proc = "JAX64")
 names(jax_times_laptop_64) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-scala_times_laptop_1 <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1.csv", header = FALSE)) %>%
+scala_times_laptop_1 <- cbind(1:50,read.csv("./data/scala_compute_times_laptop_1_d50.csv", header = FALSE)) %>%
   mutate(proc = "Scala")
 names(scala_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-r_times_laptop_1 <- cbind(1:80,read.csv("./data/R_compute_times_v2_laptop_1.csv", header = FALSE)) %>%
+r_times_laptop_1 <- cbind(1:50,read.csv("./data/R_compute_times_laptop_1_d50.csv", header = FALSE)) %>%
   mutate(proc = "R")
 names(r_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
 #+end_src
+
+#+RESULTS:
 
 We can now use ~ggplot~ to make a nice plot of this data.
 
 Putting the data together and plotting
 
 #+begin_src R :session example :results graphics file :file Figures/plot_complexity_laptop_1.png :width 1000 :exports both
-#data <- rbind(jax_times_laptop_32, jax_times_laptop_64, scala_times_laptop_1, r_times_laptop_1)
-data <- rbind(jax_times_laptop_32, jax_times_laptop_64, r_times_laptop_1)
+data <- rbind(jax_times_laptop_32, jax_times_laptop_64, scala_times_laptop_1, r_times_laptop_1)
+#data <- rbind(jax_times_laptop_32, jax_times_laptop_64, r_times_laptop_1)
 
 time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
@@ -293,7 +295,7 @@ print(b_graph)
 #+RESULTS:
 [[file:Figures/plot_b_laptop.png]]
 
-It's not clear why there is a performance difference between R and JAX (again, the scala line should be ignored for now)
+I believe this confirms that the r result should be ignored, there is something different with that version.
 
 We can see that while both perform equally as well, JAX maintains a good lead in terms of speed over both Scala and especially R.
 
@@ -302,12 +304,17 @@ We can see that while both perform equally as well, JAX maintains a good lead in
 This is the graph comparing the two versions of the algorithms' mixing capabilities (full description to be written)
 
 #+begin_src R :session example :results graphics file :file ./Figures/plot_mixing.png :height 600 :width 1200 :exports both
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+
 jax_b_mixing <- cbind(1:100,read.csv("./data/so_factor_mixing.csv", header = FALSE)) %>%
   mutate(proc = "Mixing")
-names(jax_b_mixing) <- c("j", "alsoj","b", "proc")
+names(jax_b_mixing) <- c("NA", "j","b", "proc")
 jax_b_not_mixing <- cbind(1:100,read.csv("./data/so_factor_not_mixing.csv", header = FALSE)) %>%
   mutate(proc = "Not Mixing")
-names(jax_b_not_mixing) <- c("j", "alsoj","b", "proc")
+names(jax_b_not_mixing) <- c("NA", "j","b", "proc")
 
 data <- rbind(jax_b_mixing, jax_b_not_mixing)
 
