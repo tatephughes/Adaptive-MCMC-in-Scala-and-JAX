@@ -7,6 +7,7 @@ import jax.lax as jl
 import jax.random as rand
 from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
 from jax.scipy.linalg import solve_triangular
+import numpy as np
 import time
 from AM_in_JAX_tests import *
 import csv
@@ -278,7 +279,9 @@ def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_te
         writer.writerows(y)
 
 def main(d=10, n=1000, thinrate=1000, burnin=0,
-         file="./Figures/adaptive_trace_JAX_test.png",
+         write_files = False,
+         trace_file = "./Figures/adaptive_trace_JAX_test.png",
+         csv_file = "./data/jax_sample.csv",
          mix = False,
          get_sigma = read_sigma):
 
@@ -307,15 +310,15 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
     start_state = jl.fori_loop(1, burnin+1, lambda i,x: adapt_step(x, Q, R, mix, keys[i]), state0)
 
     # the sample
-    am_sample = jl.scan(step, start_state, keys[burnin+1:])[1]
+    sample = jl.scan(step, start_state, keys[burnin+1:])[1]
 
     # the time of the computation in seconds
     end_time = time.time()
     duration = time.time() - start_time
     
     # The final sampling covariance
-    sigma_j = am_sample[3][-1] / (5.6644/d)
-    acc_rate = am_sample[4][-1] / (n*thinrate+burnin)
+    sigma_j = sample[3][-1] / (5.6644/d)
+    acc_rate = sample[4][-1] / (n*thinrate+burnin)
 
     # According to Roberts and Rosethal, this value should go to 1.
     b1 = sub_optim_factor(sigma, jnp.identity(d))
@@ -328,14 +331,19 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
     print(f"The acceptance rate is {acc_rate}")
     print(f"The computation took {duration} seconds")
 
-    # instead of this plotter function, i want it to write am_sample with all b values to a csv.
-    plot_trace(am_sample[1], file, 1)
+    if write_files:
+        
+      # use np to sample the sample to the csv_file
+      np.savetxt(csv_file, sample[1], delimiter=',')
+
+      # plot the trace of the first coordinate
+      plot_trace(sample[1], trace_file, 1)
     
-    return am_sample
+    return sample
 
 if __name__ == "__main__":
 
-    # This code checks wether the working directory is correct, and if not, attemps
+    # This code checks wether the working  directory is correct, and if not, attemps
     # to change it.
     if not (re.search(r".*/Adaptive-MCMC-in-Scala-and-JAX$", os.getcwd())):
         os.chdir("../../../")

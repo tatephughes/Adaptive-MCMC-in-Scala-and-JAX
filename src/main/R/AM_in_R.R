@@ -25,14 +25,12 @@ try_accept <- function(state, prop, alpha, mix){
 
   x_mean_new <- (x_mean*j + x_new)/(j+1)
 
-  if (mix | j < 2*d) {
-                                        # without the bias
+  if (mix || j < 2*d) { # without the bias
     prop_cov_new <- prop_cov*(j-1)/j +
       (j*tcrossprod(x_mean-x_mean_new, x_mean-x_mean_new) +
        tcrossprod(x_new - x_mean_new, x_new - x_mean_new)
       )*5.6644/(j*d)
-  } else {
-                                        # with the bias
+  } else { # with the bias
     prop_cov_new <- prop_cov*(j-1)/j +
       (j*tcrossprod(x_mean-x_mean_new, x_mean-x_mean_new) +
        tcrossprod(x_new - x_mean_new, x_new - x_mean_new) +
@@ -226,7 +224,10 @@ mixing_test <- function(sigma, n=10000, thinrate=1, mix = FALSE,
 }
 
 main <- function(d=10, n=1000, thinrate=1000, burnin=0,
-                 mix=FALSE, filepath="./Figures/trace_plot.png",
+                 mix=FALSE,
+                 write_files = FALSE, # whether to write out to files
+                 trace_file="./Figures/trace_plot.png",
+                 csv_file = "./data/r_sample.csv",
                  get_sigma = read_sigma,
                  prog=FALSE){
 
@@ -280,7 +281,15 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
   print(paste("The acceptance rate is", acc_rate))
   print(paste("The computation took", as.numeric(duration), "seconds"))
 
-  plotter(sample, filepath, 1)
+  if (write_files) {
+  
+    # Save the sample to a csv
+    write.table(lapply(sample, function(state) state$x), file = csv_file, row.names=FALSE,col.names=FALSE, sep=',')
+  
+    # Plot the trace
+    plotter(sample, trace_file, 1) 
+   
+  }
   
   return(sample)
 }

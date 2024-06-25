@@ -1,3 +1,4 @@
+
 #+TITLE: Adaptive Metropolis in Scala and JAX
 
 :BOILERPLATE:
@@ -92,100 +93,67 @@ In the file ~AM_in_JAX.org~, there is the source code as well as documentation f
 
 * Results
 
-In all implementations, we run with ~d=10~, ~n=100000~, ~burnin=100000~ and ~thinrate=10~.
+In all implementations, we run with ~d=100~, ~n=100, ~burnin=0~ and ~thinrate=10000~. These settings roughly match the original C code from Roberts and Rosenthal, where 100 iteration results where saved.
 
-** R
+For context, the original C code by Roberts and Rosenthal with d=100, n=1000000, took 431.122329 seconds.
 
-As a baseline, I have also included an R version. At the root of this project, there is an R script that can be ran. The results are as follows
+The full results of these tests can be made using the ~run.sh~
+script found at the root of the project. It also saves the trace plots as ~/Figures/<language>_trace_basetest.png~.
+
+In R:
 
 #+begin_quote
-The true variance of x_1 is 14.1301614453525
+The optimal sampling value of x_1 is 0.02486704566808
+The actual sampling value of x_1 is 0.0209341928404325
+The initial b value is 1.83282541152906
+The final b value is 1.02525674146274
+The acceptance rate is 0.103388
+The computation took 202.283761262894 seconds
 
-The empirical sigma value is 14.1117375348109
-
-The b value is 1.00003160696836
-
-The computation took 72.3016312122345 seconds
 #+end_quote
 
 #+ATTR_ORG: :height 100
-[[file:./Figures/adaptive_trace_r_d_10.png]]
+[[file:./Figures/r_trace_basetest.png]]
 
-** Scala
-
-The Scala output can be found using the command ~sbt run~ in this project's root;
+In Scala:
 
 #+begin_quote
-The true variance of x_1 is 11.731161806946728
-
-The empirical sigma value is 11.803664855741761
-
-The b value is 1.0000659032541865
-
-The computation took 8.548220083 seconds
+The optimal sampling variance of x_1 is 0.02486704566808
+The actual sampling variance of x_1 is  0.01937688808349585
+The initial b value is 73.4639993467733
+The final b value is 1.2516212501470279
+The acceptance rate is 0.104118
+The computation took 435.751518877 seconds
 #+end_quote
 
 #+ATTR_ORG: :height 100
-[[file:./Figures/adaptive_trace_scala_d_10.png]]
+[[file:./Figures/scala_trace_basetest.png]]
 
-(note that I can't get rid of the transparency in Breeze-viz, so you may have to turn off dark mode to see this properly)
-
-** JAX
-
-The JAX output can be found by running ~python AM_in_JAX.py~ in this project's root;
+And finally in JAX,
 
 #+begin_quote
-The true variance of x_1 is 8.333649635314941
-
-The empirical sigma value is 8.369915962219238
-
-The b value is 1.0001994371414185
-
-The computation took 3.0340700149536133 seconds
-#+end_quote
-
-Obviously, the numbers are different since the target variance is different (this will be addressed shortly), but this ran nearly three times as fast! R performs relatively very slowly.
-
-#+ATTR_ORG: :height 100
-[[file:./Figures/adaptive_trace_JAX_d_10.png]]
-
-
-** Very high dimensions
-
-The paper, in it's examples, get results for ~d=100~.
-
-In Scala, using thinning and burn-in, the garbage collector does a good job and we can get high enough iteration counts the the program does very well.
-
-For ~d=100~, ~n=10000~, ~burnin=1000000~, and ~thinrate=100~, I get 
-
-#+begin_quote
-The true variance of x_1 is 65.0853505983081
-
-The empirical sigma value is 66.58915290787915
-
-The b value is 1.0034403980298399
-
-The computation took 1398.362186623
-#+end_quote
-
-[[file:./Figures/adaptive_trace_scala_d_100.png]]
-
-and in JAX we get an even more significant speed boost;
-
-#+begin_quote
-The true variance of x_1 is 98.31156921386719
-
-The empirical sigma value is 96.6253662109375
-
-The b value is 1.0056523084640503
-
-The computation took 90.36556029319763 seconds
+The optimal sampling variance of x_1 is 0.024867046624422073
+The actual sampling variance of x_1 is  0.019067611545324326
+The initial b value is 73.5059814453125
+The final b value is 1.2530319690704346
+The acceptance rate is 0.10468100011348724
+The computation took 90.90827989578247 seconds
 #+end_quote
 
 #+ATTR_ORG: :height 100
-[[file:./Figures/adaptive_trace_JAX_d_100.png]]
+[[file:./Figures/jax_trace_basetest.png]]
 
-(this isn't currently the correct graph, I accidentally wrote over it, I will re-run soon)
+or in JAX with mixing
+
+#+begin_quote
+JAX output (mixing): 
+The optimal sampling variance of x_1 is 0.024867046624422073
+The actual sampling variance of x_1 is  0.018218811601400375
+The initial b value is 73.5059814453125
+The final b value is 1.0261740684509277
+The acceptance rate is 0.31248700618743896
+The computation took 48.6323938369751 seconds
+#+end_quote
 
 * Complexity vs time
 
@@ -312,7 +280,7 @@ library(patchwork)
 jax_b_mixing <- cbind(1:100,read.csv("./data/so_factor_mixing.csv", header = FALSE)) %>%
   mutate(proc = "Mixing")
 names(jax_b_mixing) <- c("NA", "j","b", "proc")
-jax_b_not_mixing <- cbind(1:100,read.csv("./data/so_factor_not_mixing.csv", header = FALSE)) %>%
+jax_b_not_mixing <- cbind(1:100,read.csv("./data/so_factor_no_mixing.csv", header = FALSE)) %>%
   mutate(proc = "Not Mixing")
 names(jax_b_not_mixing) <- c("NA", "j","b", "proc")
 
