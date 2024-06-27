@@ -241,10 +241,10 @@ We can now use ~ggplot~ to make a nice plot of this data.
 Putting the data together and plotting
 
 #+begin_src R :session example :results graphics file :file Figures/plot_complexity_laptop_1.png :width 1000 :exports both
-data <- rbind(jax_times_laptop_32_IC, jax_times_laptop_32_MD,
-              jax_times_laptop_64_IC, jax_times_laptop_64_MD,
-              r_times_laptop_IC, r_times_laptop_MD,
-              scala_times_laptop_IC, scala_times_laptop_MD)
+data <- rbind(jax_times_laptop_32_IC, jax_times_laptop_32_MD)
+#              jax_times_laptop_64_IC, jax_times_laptop_64_MD,
+#              r_times_laptop_IC, r_times_laptop_MD,
+#              scala_times_laptop_IC, scala_times_laptop_MD)
 #data <- rbind(jax_times_laptop_32, jax_times_laptop_64, r_times_laptop_1)
 
 time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
@@ -266,13 +266,17 @@ print(time_graph)
 
 (for Scala (IC), I am reasonably sure i unplugged my laptop for the last chunk, explaining the odd results)
 
+(I can also confirm that settings were incorrect pretty much across the board!)
 
 We can also plot the final sub-optimality factor, $b$, over all the dimensions;
 
 #+begin_src R :session example :results graphics file :file Figures/plot_b_laptop.png :width 1000 :exports both
 b_graph <- ggplot(data, aes(x = d, y = b, color = proc)) +
   geom_line(size = 2) +
-  scale_color_manual(values = c("JAX32" = "red", "JAX64" = "pink", "Scala" = "blue", "R" = "darkgreen")) +
+  scale_color_manual(values = c("JAX32 (IC)" = "red", "JAX32 (MD)" = "pink",
+                                "JAX64 (IC)" = "#E69F00", "JAX64 (MD)" = "#D55E00",
+                                "Scala (IC)" = "blue", "Scala (MD)" = "#56B4E9",
+                                "R (IC)" = "darkgreen", "R (MD)" = "#009E73")) +
   theme_minimal() + 
   labs(title = "Effectiveness against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
        x = "Dimension",
