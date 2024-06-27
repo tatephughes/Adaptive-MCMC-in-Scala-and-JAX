@@ -173,7 +173,7 @@ def plot_trace(sample, file_path, j=0):
     plt.grid(True)
     plt.savefig(file_path, dpi=96)
 
-def run_with_complexity(sigma_d, key):
+def run_with_complexity(sigma_d, mix, key):
 
     """Runs the main loop on a given target Covariance, and gets the time the main loop took.
 
@@ -188,13 +188,12 @@ def run_with_complexity(sigma_d, key):
     d = sigma_d.shape[0]
     
     # these numbers get good results up to d=100
-    n = 10000
-    thinrate = 10
+    n = 1
+    thinrate = 1
     burnin = 1000000
-    mix = False
 
     keys = rand.split(key, n + burnin + 1)
-    state0 = (1, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, 0)
+    state0 = (2, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, 0)
     
     def step(carry, key):
         nextstate = thinned_step(thinrate, carry, Q, R, mix, key)
@@ -217,7 +216,7 @@ def run_with_complexity(sigma_d, key):
 
     return n, thinrate, burnin, duration, float(b) # making it into a normal float for readability
 
-def compute_time_graph(sigma, csv_file="./data/JAX_compute_times_test.csv", is_64_bit=False):
+def compute_time_graph(sigma, mix=False, csv_file="./data/JAX_compute_times_test.csv", is_64_bit=False):
 
     """Loop through all the primary minors of ~sigma~ and runs the complexity test on each of them, saving the result to ~csv_file~
     """
@@ -230,7 +229,7 @@ def compute_time_graph(sigma, csv_file="./data/JAX_compute_times_test.csv", is_6
     keys = rand.split(key, d)
     
     x = range(1, d+1)
-    y = jnp.array([run_with_complexity(sigma[:i,:i], keys[i]) for i in x if print(i) or True])
+    y = jnp.array([run_with_complexity(sigma[:i,:i], mix, keys[i]) for i in x if print(i) or True])
 
     with open(csv_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -297,8 +296,8 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
     sigma = get_sigma(d=d)
     Q, R = qr(sigma) # take the QR decomposition of sigma
 
-    # initial state before burn-in
-    state0 = (1, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, 0)
+    # initial state before burn-in, j starts at "2" for safetys
+    state0 = (2, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, 0)
 
     def step(carry, key):
         nextstate = thinned_step(thinrate, carry, Q, R, mix, key)

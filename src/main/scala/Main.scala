@@ -3,6 +3,7 @@ import breeze.plot._
 import breeze.linalg._
 import breeze.numerics._
 import breeze.stats.distributions._
+import breeze.stats.distributions.Gaussian
 import org.apache.commons.math3.random.MersenneTwister
 import java.awt.Color
 import java.io.PrintWriter
@@ -33,6 +34,23 @@ extension[T](ll: LazyList[T]){
     if (lld.isEmpty) LazyList.empty else
       lld.head #:: lld.tail.thin(th)
   }
+}
+
+def backsolve(A: DenseMatrix[Double], b:DenseVector[Double]): DenseVector[Double] = {
+  /* Since Scala Breeze does not, by default, have a backsolve operator, this does exactly
+   that. For clarity, this is written with the help of ChatGPT, because I am lazy.
+
+   Despite theoretically being faster, this doesn't actually do a good job against the well-optimised ~/~.
+   */
+  val n = b.length
+
+  def solveRow(x: DenseVector[Double], i: Int): DenseVector[Double] = {
+    val sum = (i + 1 until n).foldLeft(0.0){(acc, j) => acc + A(i,j) * x(j)}
+    x(i) = (b(i) - sum) / A(i,i) // sadly Breeze is a bit mutable
+    x
+  }
+
+  (n - 1 to 0 by -1).foldLeft(DenseVector.zeros[Double](n))(solveRow)
 }
 
 object AdaptiveMetropolis:
@@ -92,11 +110,11 @@ object AdaptiveMetropolis:
 
       // update proposal covariance
       val prop_cov_new = if (mix | j < 2*d) {
-        prop_cov*(j-1)/j +
+        prop_cov*((j-1)/j) +
           (j * ((x_mean-x_mean_new) * (x_mean-x_mean_new).t) +
           ((x_new-x_mean_new) * (x_new-x_mean_new).t)) * 5.6644/(j*d)
       } else {
-        prop_cov*(j-1)/j +
+        prop_cov*((j-1)/j) +
           (j * ((x_mean-x_mean_new) * (x_mean-x_mean_new).t) +
           ((x_new-x_mean_new) * (x_new-x_mean_new).t) +
             0.01*(DenseMatrix.eye[Double](d))) * 5.6644/(j*d)
@@ -134,23 +152,16 @@ object AdaptiveMetropolis:
 
     val prop = if (j <= 2*d | (mix & (Uniform(0,1).draw() < 0.05))){
       // 'Safe' sampler
-      // NOTE: I would imagine there is a more appropriate univariate
-      // Gaussian sampler for this purpose
-      //Gaussian(x,(0.1/sqrt(d))).sample(d)
-      print("Safe sampler \n")
-      MultivariateGaussian(x, 1/sqrt(100*d)*DenseMatrix.eye[Double](d)).draw()
+      DenseVector(Gaussian(0,1).sample(d).toArray) / sqrt(100*d) + x
+      //MultivariateGaussian(x, 1/sqrt(100*d)*DenseMatrix.eye[Double](d)).draw()
     } else {
-      print("Adaptive sampler \n")
       // 'Adaptive' sampler
-      print(prop_cov)
       MultivariateGaussian(x, prop_cov).draw()
     }
 
-    // The log Hastings Ratio
+    // The log Hastings Ratio (note that i can't find a backsolve option in Scala)
     val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (prop.t * (r \ (q.t * prop))))
-    
-    // NOTE: seems inefficient to construct a diagonal identity matrix like this,
-    // I would imagine there is a better way to do this
+    //val alpha = 0.5 * ((x.t * backsolve(r, q.t*x))) - (prop.t * backsolve(r, q.t*x))
 
     return(try_accept(state, prop, alpha, mix))
 
@@ -198,11 +209,11 @@ object AdaptiveMetropolis:
     val d = sigma_d.cols
 
     // These numbers get good results up to d=100
-    val n: Int = 10000      // size of the desired sample
-    val thinrate: Int = 10   // the thinning rate
+    val n: Int = 1      // size of the desired sample
+    val thinrate: Int = 1   // the thinning rate
     val burnin: Int = 1000000 // the number of iterations for burn-in
 
-    val state0 = AM_state(1.0,
+    val state0 = AM_state(2.0, // starts at "2" for safety
                           DenseVector.zeros[Double](d),
                           DenseVector.zeros[Double](d),
                           0.01 * DenseMatrix.eye[Double](d) / d.toDouble,
@@ -295,7 +306,7 @@ object AdaptiveMetropolis:
     get_sigma: (Int => dm) = generate_sigma): Unit = {
 
     // initial state
-    val state0 = AM_state(1.0,
+    val state0 = AM_state(2.0, // starts at "2" for safety
                           DenseVector.zeros[Double](d),
                           DenseVector.zeros[Double](d),
                           0.01 * DenseMatrix.eye[Double](d) / d.toDouble,
@@ -337,21 +348,38 @@ object AdaptiveMetropolis:
     }
   }
 
-  @main def simple_run(): Unit = {
+  @main def simple_run_IC(): Unit = {
 
-    main(d=10, n=1000, thinrate=1000, burnin=0,
+    main(d=100, n=10000, thinrate=100, burnin=0,
          write_files = true,
-         trace_file = "./Figures/scala_trace_basetest.png",
-         csv_file = "./data/scala_sample.csv",
+         trace_file = "./Figures/scala_trace_basetest_IC.png",
+         csv_file = "./data/scala_sample_basetest_IC.csv",
+         get_sigma = read_sigma,
+         mix = false
+    )
+  }
+
+  @main def simple_run_MD(): Unit = {
+
+    main(d=100, n=10000, thinrate=100, burnin=0,
+         write_files = true,
+         trace_file = "./Figures/scala_trace_basetest_MD.png",
+         csv_file = "./data/scala_sample_basetest_MD.csv",
          get_sigma = read_sigma,
          mix = true
     )
+  }
+
+  @main def complexity_run_IC(): Unit = {
+
+    compute_time_graph(read_sigma(100), false,
+      "./data/scala_compute_times_laptop_1_IC.csv")
 
   }
 
-  @main def complexity_run(): Unit = {
+  @main def complexity_run_MD(): Unit = {
 
-    compute_time_graph(read_sigma(50), false,
-      "./data/scala_compute_times_laptop_1_d50.csv")
+    compute_time_graph(read_sigma(100), true,
+      "./data/scala_compute_times_laptop_1_MD.csv")
 
   }

@@ -204,18 +204,34 @@ library(patchwork)
 #+end_src
 
 #+begin_src R :session example :results output
-jax_times_laptop_32 <- cbind(1:50,read.csv("./data/JAX_32_compute_times_laptop_1_d50.csv", header = FALSE)) %>%
-  mutate(proc = "JAX32")
-names(jax_times_laptop_32) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-jax_times_laptop_64 <- cbind(1:50,read.csv("./data/JAX_64_compute_times_laptop_1_d50.csv", header = FALSE)) %>%
-  mutate(proc = "JAX64")
-names(jax_times_laptop_64) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-scala_times_laptop_1 <- cbind(1:50,read.csv("./data/scala_compute_times_laptop_1_d50.csv", header = FALSE)) %>%
-  mutate(proc = "Scala")
-names(scala_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
-r_times_laptop_1 <- cbind(1:50,read.csv("./data/R_compute_times_laptop_1_d50.csv", header = FALSE)) %>%
-  mutate(proc = "R")
-names(r_times_laptop_1) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+jax_times_laptop_32_IC <- cbind(1:100,read.csv("./data/JAX_32_compute_times_laptop_1_IC.csv", header = FALSE)) %>%
+  mutate(proc = "JAX32 (IC)")
+names(jax_times_laptop_32_IC) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+jax_times_laptop_32_MD <- cbind(1:100,read.csv("./data/JAX_32_compute_times_laptop_1_MD.csv", header = FALSE)) %>%
+  mutate(proc = "JAX32 (MD)")
+names(jax_times_laptop_32_MD) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+
+jax_times_laptop_64_IC <- cbind(1:100,read.csv("./data/JAX_64_compute_times_laptop_1_IC.csv", header = FALSE)) %>%
+  mutate(proc = "JAX64 (IC)")
+names(jax_times_laptop_64_IC) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+jax_times_laptop_64_MD <- cbind(1:100,read.csv("./data/JAX_64_compute_times_laptop_1_MD.csv", header = FALSE)) %>%
+  mutate(proc = "JAX64 (MD)")
+names(jax_times_laptop_64_MD) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+
+r_times_laptop_IC <- cbind(1:100,read.csv("./data/R_compute_times_laptop_1_IC.csv", header = FALSE)) %>%
+  mutate(proc = "R (IC)")
+names(r_times_laptop_IC) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+r_times_laptop_MD <- cbind(1:100,read.csv("./data/R_compute_times_laptop_1_MD.csv", header = FALSE)) %>%
+  mutate(proc = "R (MD)")
+names(r_times_laptop_MD) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+
+
+scala_times_laptop_IC <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1_IC.csv", header = FALSE)) %>%
+  mutate(proc = "Scala (IC)")
+names(scala_times_laptop_IC) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
+scala_times_laptop_MD <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1_MD.csv", header = FALSE)) %>%
+  mutate(proc = "Scala (MD)")
+names(scala_times_laptop_MD) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
 #+end_src
 
 #+RESULTS:
@@ -225,12 +241,18 @@ We can now use ~ggplot~ to make a nice plot of this data.
 Putting the data together and plotting
 
 #+begin_src R :session example :results graphics file :file Figures/plot_complexity_laptop_1.png :width 1000 :exports both
-data <- rbind(jax_times_laptop_32, jax_times_laptop_64, scala_times_laptop_1, r_times_laptop_1)
+data <- rbind(jax_times_laptop_32_IC, jax_times_laptop_32_MD,
+              jax_times_laptop_64_IC, jax_times_laptop_64_MD,
+              r_times_laptop_IC, r_times_laptop_MD,
+              scala_times_laptop_IC, scala_times_laptop_MD)
 #data <- rbind(jax_times_laptop_32, jax_times_laptop_64, r_times_laptop_1)
 
 time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
-  scale_color_manual(values = c("JAX32" = "red", "JAX64" = "pink", "Scala" = "blue", "R" = "darkgreen")) +
+  scale_color_manual(values = c("JAX32 (IC)" = "red", "JAX32 (MD)" = "pink",
+                                "JAX64 (IC)" = "#E69F00", "JAX64 (MD)" = "#D55E00",
+                                "Scala (IC)" = "blue", "Scala (MD)" = "#56B4E9",
+                                "R (IC)" = "darkgreen", "R (MD)" = "#009E73")) +
   theme_minimal() + 
   labs(title = "Compute Time against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
        x = "Dimension",
@@ -242,9 +264,8 @@ print(time_graph)
 #+RESULTS:
 [[file:Figures/plot_complexity_laptop_1.png]]
 
-Scala was not properly re-ran yet!
+(for Scala (IC), I am reasonably sure i unplugged my laptop for the last chunk, explaining the odd results)
 
-Also, the strange 64 bit behaviour in JAX has disappeared?
 
 We can also plot the final sub-optimality factor, $b$, over all the dimensions;
 

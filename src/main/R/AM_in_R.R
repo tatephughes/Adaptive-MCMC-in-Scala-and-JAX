@@ -25,12 +25,14 @@ try_accept <- function(state, prop, alpha, mix){
 
   x_mean_new <- (x_mean*j + x_new)/(j+1)
 
-  if (mix || j < 2*d) { # without the bias
+  if (mix | j < 2*d) {
+                                        # without the bias
     prop_cov_new <- prop_cov*(j-1)/j +
       (j*tcrossprod(x_mean-x_mean_new, x_mean-x_mean_new) +
        tcrossprod(x_new - x_mean_new, x_new - x_mean_new)
       )*5.6644/(j*d)
-  } else { # with the bias
+  } else {
+                                        # with the bias
     prop_cov_new <- prop_cov*(j-1)/j +
       (j*tcrossprod(x_mean-x_mean_new, x_mean-x_mean_new) +
        tcrossprod(x_new - x_mean_new, x_new - x_mean_new) +
@@ -111,9 +113,7 @@ plotter <- function(sample, filepath, d){
   ggsave(filepath, plot = trace_plot, width = 590/96, height = 370/96, dpi = 96)
 }
 
-run_with_complexity <- function(sigma_d){
-
-  mix = FALSE
+run_with_complexity <- function(sigma_d, mix){
   
   qr <- qr(sigma_d)
   Q <- qr.Q(qr)
@@ -121,11 +121,11 @@ run_with_complexity <- function(sigma_d){
 
   d = sqrt(length(sigma_d))
   
-  n = 10000
-  thinrate = 10
+  n = 1
+  thinrate = 1
   burnin = 1000000
-
-  state <- list(j = 1, x = rep(0,d), x_mean = rep(0,d), prop_cov = (0.1)^2*diag(d)/d, 0)
+  
+  state <- list(j = 2, x = rep(0,d), x_mean = rep(0,d), prop_cov = (0.1)^2*diag(d)/d, 0)
   
   sample <- vector("list", n)
 
@@ -152,7 +152,7 @@ run_with_complexity <- function(sigma_d){
   return(c(n, thinrate, burnin, duration, b))
 }
 
-compute_time_graph <- function(sigma, csv_file = "./data/R_compute_times_test.csv"){
+compute_time_graph <- function(sigma, mix=FALSE, csv_file = "./data/R_compute_times_test.csv"){
 
   d = dim(sigma)[1]
   
@@ -160,7 +160,7 @@ compute_time_graph <- function(sigma, csv_file = "./data/R_compute_times_test.cs
   
   for (i in 1:d) {
 
-    y[i, ] <-run_with_complexity(sigma[1:i,1:i])
+    y[i, ] <-run_with_complexity(sigma[1:i,1:i], mix)
 
     print(i)
     
@@ -195,7 +195,8 @@ mixing_test <- function(sigma, n=10000, thinrate=1, mix = FALSE,
   Q <- qr.Q(qr)
   R <- qr.R(qr)
 
-  state <- list(j = 1, x = rep(0,d),
+  state <- list(j = 2, # starts at "2" for safety
+                x = rep(0,d),
                 x_mean = rep(0,d),
                 prop_cov = (0.1)^2*diag(d)/d,
                 accept_count = 0)
@@ -284,7 +285,7 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
   if (write_files) {
   
     # Save the sample to a csv
-    write.table(lapply(sample, function(state) state$x), file = csv_file, row.names=FALSE,col.names=FALSE, sep=',')
+    write.table(do.call(rbind, lapply(sample, function(state) state$x)), file = csv_file, row.names=FALSE,col.names=FALSE, sep=',')
   
     # Plot the trace
     plotter(sample, trace_file, 1) 
