@@ -1,4 +1,3 @@
-
 #+TITLE: Adaptive Metropolis in Scala and JAX
 
 :BOILERPLATE:
@@ -191,8 +190,6 @@ with open('data/very_chaotic_variance.csv', 'w', newline='') as csvfile:
 #+RESULTS:
 [[file:data/chaotic_variance.csv]]
 
-** Plotting
-
 From here, both versions have a function ~compute_time_graph~ which outputs a csv file containing the time it took to compute over a million iterations for each submatrix of the intputted variance matrix, whcih will be provided from this file. This is then plotted as below using R.
 
 #+begin_src R :session example :results none
@@ -241,11 +238,12 @@ We can now use ~ggplot~ to make a nice plot of this data.
 Putting the data together and plotting
 
 #+begin_src R :session example :results graphics file :file Figures/plot_complexity_laptop_1.png :width 1000 :exports both
-data <- rbind(jax_times_laptop_32_IC, jax_times_laptop_32_MD)
+#data <- rbind(jax_times_laptop_32_IC, jax_times_laptop_32_MD,
 #              jax_times_laptop_64_IC, jax_times_laptop_64_MD,
 #              r_times_laptop_IC, r_times_laptop_MD,
 #              scala_times_laptop_IC, scala_times_laptop_MD)
-#data <- rbind(jax_times_laptop_32, jax_times_laptop_64, r_times_laptop_1)
+
+data <- rbind(r_times_laptop_IC, jax_times_laptop_32_MD)
 
 time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
@@ -287,6 +285,8 @@ print(b_graph)
 
 #+RESULTS:
 [[file:Figures/plot_b_laptop.png]]
+
+In truth, both of the above are in IC mode. Where does the difference come from?
 
 I believe this confirms that the r result should be ignored, there is something different with that version.
 

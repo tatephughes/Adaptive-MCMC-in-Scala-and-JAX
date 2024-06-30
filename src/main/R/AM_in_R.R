@@ -228,7 +228,7 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
                  mix=FALSE,
                  write_files = FALSE, # whether to write out to files
                  trace_file="./Figures/trace_plot.png",
-                 csv_file = "./data/r_sample.csv",
+                 sample_file = "./data/r_sample",
                  get_sigma = read_sigma,
                  prog=FALSE){
 
@@ -283,9 +283,28 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
   print(paste("The computation took", as.numeric(duration), "seconds"))
 
   if (write_files) {
-  
+    
+    b_values <- toString(lapply(lapply(sample, function(y){y$prop_cov}),
+                                function(y){sub_optim_factor(sigma, y)}))
+
+    if (mix) {
+      instance = "MD"
+    } else {
+      instance = "IC"
+    }
+
+    samplestring = paste(lapply(sample, function(y){toString(y$x)}), collapse=', ')
+
+    lines = c(
+      paste("compute_time_R_", instance, " <- ", as.numeric(duration), sep=''),
+      paste("sample_R_", instance, " <- matrix(c(", samplestring, "), ncol=", d, ")", sep=''),
+      paste("bvals_r_", instance, " <- c(", b_values, ")", sep='')
+    )
+
+    cat(paste(lines, collapse = "\n\n"), file = sample_file)
+    
     # Save the sample to a csv
-    write.table(do.call(rbind, lapply(sample, function(state) state$x)), file = csv_file, row.names=FALSE,col.names=FALSE, sep=',')
+    #write.table(do.call(rbind, lapply(sample, function(state) state$x)), file = csv_file, row.names=FALSE,col.names=FALSE, sep=',')
   
     # Plot the trace
     plotter(sample, trace_file, 1) 

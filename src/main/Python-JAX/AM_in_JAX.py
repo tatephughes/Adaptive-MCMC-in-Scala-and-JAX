@@ -49,14 +49,14 @@ def try_accept(state, prop, alpha, mix, key):
   # update proposal covariance
   prop_cov_new = jnp.select(condlist   = [mix | (j<2*d), (not mix) & (j>=2*d)],
                             choicelist = [
-                              prop_cov*((j-1)/j)
-                              + (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new)
-                              + jnp.outer(x_new - x_mean_new, x_new - x_mean_new)
+                              prop_cov*((j-1)/j) +
+                              (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new) +
+                               jnp.outer(x_new - x_mean_new, x_new - x_mean_new)
                                  )*5.6644/(j*d),
-                              prop_cov*((j-1)/j)
-                              + (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new)
-                              + jnp.outer(x_new - x_mean_new, x_new - x_mean_new)
-                              + 0.01*jnp.identity(d)
+                              prop_cov*((j-1)/j) +
+                              (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new) +
+                               jnp.outer(x_new - x_mean_new, x_new - x_mean_new) +
+                               0.01*jnp.identity(d)
                                  )*5.6644/(j*d)],
                             default = 1)
   
@@ -84,7 +84,7 @@ def adapt_step(state, q, r, mix, key):
     
     keys = rand.split(key,3)
 
-    prop = jl.cond((j <= 2*d) | (mix & (rand.uniform(keys[0]) < 0.05)),
+    prop = jl.cond((j <= 2*d) | (mix & (rand.uniform(keys[0]) < 0.01)),
                    lambda key: rand.normal(key, shape=(d,))/(jnp.sqrt(100*d)) + x, # 'Safe' sampler
                    lambda key: rand.multivariate_normal(key, x, prop_cov), # 'Adaptive' sampler
                    keys[1])
@@ -126,25 +126,6 @@ def sub_optim_factor(sigma, sigma_j):
     """
     
     d = sigma.shape[0]
-    
-    """
-    sigma_j_decomp = eigh(sigma_j)
-    sigma_decomp = eigh(sigma)
-    
-    rootsigmaj = sigma_j_decomp[1] @ jnp.diag(jnp.sqrt(sigma_j_decomp[0])) @ inv(sigma_j_decomp[1])
-    rootsigmainv = inv(sigma_decomp[1]) @ jnp.diag(1/jnp.sqrt(sigma_decomp[0])) @ sigma_decomp[1]
-
-    # the below line relies on the ~eig~ function which doesn't work on GPUs
-    lam = eig(rootsigmaj @ rootsigmainv)[0]
-    """
-
-    # maybe they meant cholesky?
-    #lam = eig(cholesky(sigma_j) @ inv(cholesky(sigma)))[0]
-    # the cleanest BUT NOT THE MOST EFFICIENT
-    #lam = eig(mat_sqrt(sigma_j) @ inv(mat_sqrt(sigma)))[0]
-
-    # without the square roots?
-    #lam = eig(sigma_j @ inv(sigma))[0]
 
     # looking at their code, this might be what was intended?
     lam = eig(sigma_j @ inv(sigma))[0]
@@ -280,13 +261,16 @@ def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_te
 def main(d=10, n=1000, thinrate=1000, burnin=0,
          write_files = False,
          trace_file = "./Figures/adaptive_trace_JAX_test.png",
-         csv_file = "./data/jax_sample.csv",
+         sample_file = "./data/jax_sample",
          mix = False,
-         get_sigma = read_sigma):
+         get_sigma = read_sigma,
+         use_64 = False):
 
     """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.I
     """
 
+    jax.config.update('jax_enable_x64', use_64)
+    
     # the actual number of iterations is n*thin + burnin
 
     # keys for PRNG
@@ -331,13 +315,41 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
     print(f"The computation took {duration} seconds")
 
     if write_files:
-        
-      # use np to sample the sample to the csv_file
-      np.savetxt(csv_file, sample[1], delimiter=',')
 
-      # plot the trace of the first coordinate
-      plot_trace(sample[1], trace_file, 1)
+        # This mess writes out the sample into a format to be read by R with "source("<filename>")"
+
+        eff_func = lambda M: sub_optim_factor(sigma, M)
+        eff_vectorised = jax.vmap(eff_func)
+
+        b_values = ', '.join(map(str, eff_vectorised(sample[3])))
     
+        if mix:
+            if use_64:
+                instance = "64_MD"
+            else:
+                instance = "32_MD"
+        else:
+            if use_64:
+                instance = "64_IC"
+            else:
+                instance = "32_IC"
+
+        lines = [
+            f"compute_time_jax_{instance} <- {duration}",
+            f"sample_jax_{instance} <- matrix(c(" + ', '.join(map(str, sample[1].flatten())) + f"), ncol={d})",
+            f"bvals_jax_{instance} <- c(" + ', '.join(map(str, b_values)) + ")"
+        ]
+                
+        with open(sample_file, 'w') as f:
+            for line in lines:
+                    f.write(line + "\n\n")
+            
+        # use np to sample the sample to the csv_file
+        # np.savetxt(csv_file, sample[1], delimiter=',')
+
+        # plot the trace of the first coordinate
+        plot_trace(sample[1], trace_file, 1)
+        
     return sample
 
 if __name__ == "__main__":

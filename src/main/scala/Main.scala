@@ -37,26 +37,6 @@ extension[T](ll: LazyList[T]){
   }
 }
 
-import dev.ludovic.netlib.blas.BLAS.{ getInstance => blas }
-
-/**
- * Backsolve an upper-triangular linear system
- * with a single RHS
- *
- * @param A An upper-triangular matrix
- * @param y A single vector RHS
- *
- * @return The solution, x, of the linear system A x = y
- * From Darren Wilkinson's scala-glm repo,
- * https://github.com/darrenjw/scala-glm/blob/master/src/main/scala/scalaglm/Utils.scala
- */
-def backSolve(A: DenseMatrix[Double],
-  y: DenseVector[Double]): DenseVector[Double] = {
-  val yc = y.copy
-  blas.dtrsv("U", "N", "N", A.cols, A.toArray,
-    A.rows, yc.data, 1)
-  yc
-}
 
 object AdaptiveMetropolis:
 
@@ -155,7 +135,7 @@ object AdaptiveMetropolis:
       print(s"** Used Memory (MB): ${(runtime.totalMemory-runtime.freeMemory)/(1048576)}")
     }
 
-    val prop = if (j <= 2*d | (mix & (Uniform(0,1).draw() < 0.05))){
+    val prop = if (j <= 2*d | (mix & (Uniform(0,1).draw() < 0.01))){
       // 'Safe' sampler
       DenseVector(Gaussian(0,1).sample(d).toArray) / sqrt(100*d) + x
       //MultivariateGaussian(x, 1/sqrt(100*d)*DenseMatrix.eye[Double](d)).draw()
@@ -305,7 +285,7 @@ object AdaptiveMetropolis:
     burnin: Int = 0,
     write_files: Boolean = false,
     trace_file: String = "./Figures/adaptive_trace_Scala.png",
-    csv_file: String = "./data/scala_sample.csv",
+    sample_file: String = "./data/scala_sample",
     prog: Boolean = false,
     mix: Boolean = false,
     get_sigma: (Int => dm) = generate_sigma): Unit = {
@@ -345,8 +325,22 @@ object AdaptiveMetropolis:
     print("\nThe computation took " + duration + " seconds\n" )
 
     if (write_files) {
-      // write the actual final sample to a csv
-      csvwrite(new File(csv_file), DenseMatrix(sample.map(_.x): _*), separator=',')
+      // This mess writes out the sample into a format to be read by R with "source("<filename>")"
+
+      val b_values: String = sample.map(_.prop_cov).map(sub_optim_factor(sigma, _)).toArray.mkString(", ")
+
+      val instance = if (mix) {"MD"} else {"IC"}
+      val samplestring = DenseMatrix(sample.map(_.x): _*).toArray.mkString(", ")
+
+      val lines: Seq[String] = Seq(
+        s"compute_time_scala_$instance <- $duration",
+        s"sample_scala_$instance <- matrix(c($samplestring), ncol=$d)",
+        s"bvals_scala_$instance <- c($b_values)"
+      )
+
+      val writer = new PrintWriter(new File(sample_file))
+      writer.write(lines.mkString("\n\n"))
+      writer.close()
 
       // plot the trace of the first coordinate
       plot_trace(sample.map(_.x), trace_file)
@@ -355,10 +349,10 @@ object AdaptiveMetropolis:
 
   @main def quick_run(): Unit = {
 
-    main(d=10, n=10000, thinrate=1, burnin=0,
+    main(d=3, n=1000, thinrate=1, burnin=0,
          write_files = true,
          trace_file = "./Figures/scala_trace_basetest_IC.png",
-         csv_file = "./data/scala_sample_basetest_IC.csv",
+         sample_file = "./data/scala_sample_quickrun",
          get_sigma = read_sigma,
          mix = false
     )
@@ -369,7 +363,7 @@ object AdaptiveMetropolis:
     main(d=100, n=10000, thinrate=100, burnin=0,
          write_files = true,
          trace_file = "./Figures/scala_trace_basetest_IC.png",
-         csv_file = "./data/scala_sample_basetest_IC.csv",
+         sample_file = "./data/scala_sample_basetest_IC",
          get_sigma = read_sigma,
          mix = false
     )
@@ -380,7 +374,7 @@ object AdaptiveMetropolis:
     main(d=100, n=10000, thinrate=100, burnin=0,
          write_files = true,
          trace_file = "./Figures/scala_trace_basetest_MD.png",
-         csv_file = "./data/scala_sample_basetest_MD.csv",
+         sample_file = "./data/scala_sample_basetest_MD",
          get_sigma = read_sigma,
          mix = true
     )
