@@ -1,4 +1,5 @@
 //import com.github.fommil.netlib.BLAS
+import dev.ludovic.netlib.blas.NativeBLAS
 import breeze.plot._
 import breeze.linalg._
 import breeze.numerics._
@@ -346,6 +347,17 @@ object AdaptiveMetropolis:
       // plot the trace of the first coordinate
       plot_trace(sample.map(_.x), trace_file)
     }
+  }
+
+  @main def quick_run(): Unit = {
+
+    main(d=10, n=10000, thinrate=1, burnin=0,
+         write_files = true,
+         trace_file = "./Figures/scala_trace_basetest_IC.png",
+         csv_file = "./data/scala_sample_basetest_IC.csv",
+         get_sigma = read_sigma,
+         mix = false
+    )
   }
 
   @main def simple_run_IC(): Unit = {
