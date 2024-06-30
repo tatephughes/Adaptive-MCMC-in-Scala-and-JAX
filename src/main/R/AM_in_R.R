@@ -27,13 +27,13 @@ try_accept <- function(state, prop, alpha, mix){
 
   if (mix | j < 2*d) {
                                         # without the bias
-    prop_cov_new <- prop_cov*(j-1)/j +
+    prop_cov_new <- prop_cov*((j-1)/j) +
       (j*tcrossprod(x_mean-x_mean_new, x_mean-x_mean_new) +
        tcrossprod(x_new - x_mean_new, x_new - x_mean_new)
       )*5.6644/(j*d)
   } else {
                                         # with the bias
-    prop_cov_new <- prop_cov*(j-1)/j +
+    prop_cov_new <- prop_cov*((j-1)/j) +
       (j*tcrossprod(x_mean-x_mean_new, x_mean-x_mean_new) +
        tcrossprod(x_new - x_mean_new, x_new - x_mean_new) +
        0.01*diag(d)
@@ -54,13 +54,13 @@ adapt_step <- function(state, q, r, mix){
   prop_cov = state$prop_cov
   d        = length(x)
 
-  if (j <= 2*d || (mix && (runif(1) < 0.05))) {
+  if (j <= 2*d || (mix && (runif(1) < 0.01))) {
     prop <- rnorm(d)/sqrt(100*d) + x
   } else {
     prop <- rmvn(1, x, prop_cov)[1,]
   }
   
-                                        # Compute the log acceptance probability
+  # Compute the log acceptance probability
   alpha = 0.5 * (t(x) %*% (backsolve(r, t(q) %*% x))
     - (t(prop) %*% backsolve(r, t(q) %*% prop)))
   
@@ -80,7 +80,7 @@ sub_optim_factor <- function(sigma, sigma_j){
   #lam = eigen(mat_sqrt(sigma_j) %*% mat_sqrt(solve(sigma)))$values
 
   # but the paper's code suggests this
-  lam = eigen(chol(sigma_j) %*% solve(chol(sigma)))$values
+  lam = eigen(sigma_j %*% solve(sigma))$values
 
   b = (length(lam) * (sum(lam^(-2)) / (sum(lam^(-1)))^2))
 
