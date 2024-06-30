@@ -37,21 +37,25 @@ extension[T](ll: LazyList[T]){
   }
 }
 
-def backsolve(A: DenseMatrix[Double], b:DenseVector[Double]): DenseVector[Double] = {
-  /* Since Scala Breeze does not, by default, have a backsolve operator, this does exactly
-   that. For clarity, this is written with the help of ChatGPT, because I am lazy.
+import dev.ludovic.netlib.blas.BLAS.{ getInstance => blas }
 
-   Despite theoretically being faster, this doesn't actually do a good job against the well-optimised ~/~.
-   */
-  val n = b.length
-
-  def solveRow(x: DenseVector[Double], i: Int): DenseVector[Double] = {
-    val sum = (i + 1 until n).foldLeft(0.0){(acc, j) => acc + A(i,j) * x(j)}
-    x(i) = (b(i) - sum) / A(i,i) // sadly Breeze is a bit mutable
-    x
-  }
-
-  (n - 1 to 0 by -1).foldLeft(DenseVector.zeros[Double](n))(solveRow)
+/**
+ * Backsolve an upper-triangular linear system
+ * with a single RHS
+ *
+ * @param A An upper-triangular matrix
+ * @param y A single vector RHS
+ *
+ * @return The solution, x, of the linear system A x = y
+ * From Darren Wilkinson's scala-glm repo,
+ * https://github.com/darrenjw/scala-glm/blob/master/src/main/scala/scalaglm/Utils.scala
+ */
+def backSolve(A: DenseMatrix[Double],
+  y: DenseVector[Double]): DenseVector[Double] = {
+  val yc = y.copy
+  blas.dtrsv("U", "N", "N", A.cols, A.toArray,
+    A.rows, yc.data, 1)
+  yc
 }
 
 object AdaptiveMetropolis:
@@ -160,9 +164,9 @@ object AdaptiveMetropolis:
       MultivariateGaussian(x, prop_cov).draw()
     }
 
-    // The log Hastings Ratio (note that i can't find a backsolve option in Scala)
+    // The log Hastings Ratio (backSolve isn't exposed in breeze, but i seem to get much worse performance with it for some reason?)
     val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (prop.t * (r \ (q.t * prop))))
-    //val alpha = 0.5 * ((x.t * backsolve(r, q.t*x))) - (prop.t * backsolve(r, q.t*x))
+    //val alpha = 0.5 * ((x.t * backSolve(r, q.t * x))) - (prop.t * backSolve(r, q.t * prop))
 
     return(try_accept(state, prop, alpha, mix))
 
