@@ -1,0 +1,131 @@
+#+TITLE: diagnostics in R
+
+The package ~coda~ has some tools for MCMC diagnosing;
+#+begin_src R :session example :results none
+library(coda)
+#+end_src
+
+We perform some diagnostics in R.
+
+#+begin_src R :session example :results output :exports both
+# Read the data in
+
+# compute_time_scala_IC, sample_scala_IC, bvals_scala_IC
+source("./data/scala_sample_basetest_IC")
+
+# compute_time_scala_MD, sample_scala_MD, bvals_scala_MD
+source("./data/scala_sample_basetest_MD")
+
+# compute_time_jax_32_IC, sample_jax_32_IC, bvals_jax_32_IC
+source("./data/jax_sample_basetest_IC")
+
+# compute_time_jax_32_MD, sample_jax_32_MD, bvals_jax_32_MD
+source("./data/jax_sample_basetest_MD")
+
+# compute_time_r_IC, sample_r_IC, bvals_r_IC
+source("./data/r_sample_basetest_IC")
+
+# compute_time_r_MD, sample_r_MD, bvals_r_MD
+source("./data/r_sample_basetest_MD")
+
+
+# these should all come from the settings
+thinrate <- 100
+n <- 10000
+burnin <- 0
+d <- 0
+#+end_src
+
+#+begin_src R :session example :results output :exports both
+r_IC_chain <- mcmc(sample_R_IC, thin=thinrate, start=0)
+r_MD_chain <- mcmc(sample_R_MD, thin=thinrate, start=0)
+scala_IC_chain <- mcmc(sample_scala_IC, thin=thinrate, start=0)
+scala_MD_chain <- mcmc(sample_scala_MD, thin=thinrate, start=0)
+jax_IC_chain <- mcmc(sample_jax_32_IC, thin=thinrate, start=0)
+jax_MD_chain <- mcmc(sample_jax_32_MD, thin=thinrate, start=0)
+
+print(paste("The R (IC) minimum effective sample size is", min(effectiveSize(r_IC_chain))))
+print(paste("The R (MD) minimum effective sample size is", min(effectiveSize(r_MD_chain))))
+print(paste("The Scala (IC) minimum effective sample size is", min(effectiveSize(scala_IC_chain))))
+print(paste("The Scala (MD) minimum effective sample size is", min(effectiveSize(scala_MD_chain))))
+print(paste("The JAX (IC) minimum effective sample size is", min(effectiveSize(jax_IC_chain))))
+print(paste("The JAX (MD) minimum effective sample size is", min(effectiveSize(jax_MD_chain))))
+#+end_src
+
+#+RESULTS:
+: [1] "The R (IC) average effective sample size is 2028.92884681784"
+: [1] "The R (MD) average effective sample size is 2492.79528011475"
+: [1] "The Scala (IC) average effective sample size is 621.826737847852"
+: [1] "The Scala (MD) average effective sample size is 1167.50446121078"
+: [1] "The JAX (IC) average effective sample size is 2132.52117854634"
+: [1] "The JAX (MD) average effective sample size is 2673.91351559329"
+
+I definitely should be concerned about how much worse scala performed.
+
+#+begin_src R :session example :results graphics file :file ./Figures/plot_mixing_full.png :height 600 :width 1200 :exports both
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+
+b_vals_data <- data.frame(thinrate*(1:n), bvals_scala_IC, bvals_scala_MD,
+                          bvals_jax_32_IC, bvals_jax_32_MD,
+                          bvals_r_IC, bvals_r_MD)[-1,] # remove the first data point cause R is funny
+names(b_vals_data) <- c("j", "SCALA_IC", "SCALA_MD",
+                        "JAX32_IC", "JAX32_MD",
+                        "R_IC", "R_MD")
+b_vals_long <- b_vals_data %>% pivot_longer(c(SCALA_IC, SCALA_MD,
+                                              JAX32_IC, JAX32_MD,
+                                              R_IC, R_MD))
+names(b_vals_long) <- c("j", "proc", "b")
+
+plot_mixing <- ggplot(b_vals_long, aes(x = j, y = b, color = proc)) +
+  geom_line(size = 0.5) +
+  scale_color_manual(values = c("SCALA_IC" = "blue", "SCALA_MD" = "lightblue",
+                                "JAX32_IC" = "pink", "JAX32_MD" = "red",
+                                "R_IC" = "green", "R_MD" = "darkgreen"
+                                )) +
+  theme_minimal() + 
+  labs(title = "Mixing Factor (Intel core i7 12700H, 16Gb RAM, Arch Linux)") +
+  theme(text = element_text(size = 20))
+print(plot_mixing)
+#+end_src
+
+#+RESULTS:
+[[file:./Figures/plot_mixing_full.png]]
+
+
+Why do we not get two separate lines for MD and IC?
+
+I should repeat everything with different PRNG and take averages to smooth things out, 
+
+Zooming in on the last segment,
+
+#+begin_src R :session example :results graphics file :file ./Figures/plot_mixing_zoomed.png :height 600 :width 1200 :exports both
+b_vals_data <- data.frame(thinrate*(1:n), bvals_scala_IC, bvals_scala_MD,
+                          bvals_jax_32_IC, bvals_jax_32_MD,
+                          bvals_r_IC, bvals_r_MD) %>% slice(-(1:5000)) # remove the first data point cause R is funny
+names(b_vals_data) <- c("j", "SCALA_IC", "SCALA_MD",
+                        "JAX32_IC", "JAX32_MD",
+                        "R_IC", "R_MD")
+b_vals_long <- b_vals_data %>% pivot_longer(c(SCALA_IC, SCALA_MD,
+                                              JAX32_IC, JAX32_MD,
+                                              R_IC, R_MD))
+names(b_vals_long) <- c("j", "proc", "b")
+
+plot_mixing <- ggplot(b_vals_long, aes(x = j, y = b, color = proc)) +
+  geom_line(size = 0.5) +
+  scale_color_manual(values = c("SCALA_IC" = "blue", "SCALA_MD" = "lightblue",
+                                "JAX32_IC" = "pink", "JAX32_MD" = "red",
+                                "R_IC" = "green", "R_MD" = "darkgreen"
+                                )) +
+  theme_minimal() + 
+  labs(title = "Mixing Factor (Intel core i7 12700H, 16Gb RAM, Arch Linux)") +
+  theme(text = element_text(size = 20))
+print(plot_mixing)
+#+end_src
+
+#+RESULTS:
+[[file:./Figures/plot_mixing_zoomed.png]]
+
+We can see a very clear distinction between the MC group and the IC group, and very little difference in the performance of the languages, as we might hope!

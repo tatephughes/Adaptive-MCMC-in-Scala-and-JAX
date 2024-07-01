@@ -90,7 +90,9 @@ As you might imagine, the JAX implentation is very similar, even if it is a bit 
 
 In the file ~AM_in_JAX.org~, there is the source code as well as documentation for all the functions, but it is very similar to the scala version.
 
-* Results
+* Results & Diagnostics
+
+For more detailed results, see the ~diagnostics.org~ file. 
 
 In all implementations, we run with ~d=100~, ~n=100, ~burnin=0~ and ~thinrate=10000~. These settings roughly match the original C code from Roberts and Rosenthal, where 100 iteration results where saved.
 
@@ -154,43 +156,19 @@ The acceptance rate is 0.31248700618743896
 The computation took 48.6323938369751 seconds
 #+end_quote
 
-* Complexity vs time
+We can also plot out the sub optimality factor of each of these;
 
-In order to get a better idea of how these implementations compare, we use the same chaotic variance matrix for both, with increasing submatrices, so we can make a graph of problem dimension, ~d~, against time.
+#+CAPTION: Sub-Optimality Factor accross all 1,000,000 iterations
+#+NAME: fig:
+[[file:/home/tate/MyProjects/Adaptive-MCMC-in-Scala-and-JAX/Figures/plot_mixing_full.png]]
 
-Firstly, here is a little python code to write out the matrix to a csv file, so both programs can read it, so we control the target variance;
+#+CAPTION: Sub-Optimality Factor across the last 500,000 iterations
+#+NAME: fig:
+[[file:/home/tate/MyProjects/Adaptive-MCMC-in-Scala-and-JAX/Figures/plot_mixing_zoomed.png]]
 
-#+begin_src python :session example :results file
-import jax
-import jax.numpy as jnp
-import jax.random as rand
-import csv
-import numpy as np
-from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
+We can see a very clear difference in the performance of the two algorithms; I must say the performance of IC is concerning me a bit, I expected them to perform somewhat similarly.
 
-# keys for PRNG
-key = rand.PRNGKey(seed=1)
-
-d = 100
-
-# create a chaotic variance matrix to target
-M = rand.normal(key, shape = (d,d))
-sigma = inv(M @ M.T)
-
-with open('data/very_chaotic_variance.csv', 'w', newline='') as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerows(np.array(sigma))
-
-
-
-    
-'data/chaotic_variance.csv'
-#+end_src
-
-#+RESULTS:
-[[file:data/chaotic_variance.csv]]
-
-From here, both versions have a function ~compute_time_graph~ which outputs a csv file containing the time it took to compute over a million iterations for each submatrix of the intputted variance matrix, whcih will be provided from this file. This is then plotted as below using R.
+From here, all versions have a function ~compute_time_graph~ which outputs a csv file containing the time it took to compute over a million iterations for each submatrix of the intputted variance matrix, whcih will be provided from this file. This is then plotted as below using R.
 
 #+begin_src R :session example :results none
 #library(ascii)
@@ -258,68 +236,4 @@ time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
 print(time_graph)
 #+end_src
 
-#+RESULTS:
-[[file:Figures/plot_complexity_laptop_1.png]]
-
-(for Scala (IC), I am reasonably sure i unplugged my laptop for the last chunk, explaining the odd results)
-
-(I can also confirm that settings were incorrect pretty much across the board!)
-
-We can also plot the final sub-optimality factor, $b$, over all the dimensions;
-
-#+begin_src R :session example :results graphics file :file Figures/plot_b_laptop.png :width 1000 :exports both
-b_graph <- ggplot(data, aes(x = d, y = b, color = proc)) +
-  geom_line(size = 2) +
-  scale_color_manual(values = c("JAX32 (IC)" = "red", "JAX32 (MD)" = "pink",
-                                "JAX64 (IC)" = "#E69F00", "JAX64 (MD)" = "#D55E00",
-                                "Scala (IC)" = "blue", "Scala (MD)" = "#56B4E9",
-                                "R (IC)" = "darkgreen", "R (MD)" = "#009E73")) +
-  theme_minimal() + 
-  labs(title = "Effectiveness against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
-       x = "Dimension",
-       y = "b") +
-  theme(text = element_text(size = 20))
-print(b_graph)
-#+end_src
-
-#+RESULTS:
-[[file:Figures/plot_b_laptop.png]]
-
-In truth, both of the above are in IC mode. Where does the difference come from?
-
-I believe this confirms that the r result should be ignored, there is something different with that version.
-
-We can see that while both perform equally as well, JAX maintains a good lead in terms of speed over both Scala and especially R.
-
-* Mixing
-
-This is the graph comparing the two versions of the algorithms' mixing capabilities (full description to be written)
-
-#+begin_src R :session example :results graphics file :file ./Figures/plot_mixing.png :height 600 :width 1200 :exports both
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(patchwork)
-
-jax_b_mixing <- cbind(1:100,read.csv("./data/so_factor_mixing.csv", header = FALSE)) %>%
-  mutate(proc = "Mixing")
-names(jax_b_mixing) <- c("NA", "j","b", "proc")
-jax_b_not_mixing <- cbind(1:100,read.csv("./data/so_factor_no_mixing.csv", header = FALSE)) %>%
-  mutate(proc = "Not Mixing")
-names(jax_b_not_mixing) <- c("NA", "j","b", "proc")
-
-data <- rbind(jax_b_mixing, jax_b_not_mixing)
-
-plot_mixing <- ggplot(data, aes(x = j, y = b, color = proc)) +
-  geom_line(size = 2) +
-  scale_color_manual(values = c("Mixing" = "blue", "Not Mixing" = "red")) +
-  theme_minimal() + 
-  labs(title = "Mixing Factor (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
-       x = "j",
-       y = "b") +
-  theme(text = element_text(size = 20))
-print(plot_mixing)
-#+end_src
-
-#+RESULTS:
-[[file:./Figures/plot_mixing.png]]
+I have yet to properly re-run this.
