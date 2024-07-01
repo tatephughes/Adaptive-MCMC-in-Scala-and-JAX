@@ -14,6 +14,7 @@ import scala.util.chaining
 import java.io.File
 import breeze.linalg.{CSCMatrix, csvwrite}
 
+
 // randombasis and seed for PRNG
 implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(41L)))
 
@@ -52,7 +53,7 @@ object AdaptiveMetropolis:
     and saves the figure to ~file_path~
      */
 
-    val y = DenseVector(sample.map(x => x(1)))
+    val y = DenseVector(sample.map(x => x(0)))
     val x = DenseVector.tabulate(y.length)(i => (i+1).toDouble)
 
     val f = Figure("Trace Plot of the first coordinate")
@@ -345,7 +346,9 @@ object AdaptiveMetropolis:
       writer.write(lines.mkString("\n\n"))
       writer.close()
 
-      print("Done!")
+      print("Done!\n")
+
+      val x_sample = sample.map(_.x)
 
       // plot the trace of the first coordinate
       //plot_trace(sample.map(_.x), trace_file)
@@ -369,6 +372,17 @@ object AdaptiveMetropolis:
          write_files = true,
          trace_file = "./Figures/scala_trace_basetest_IC.png",
          sample_file = "./data/scala_sample_basetest_IC",
+         get_sigma = read_sigma,
+         mix = false
+    )
+  }
+
+  @main def simple_run_IC_quick(): Unit = {
+
+    main(d=10, n=10000, thinrate=100, burnin=0,
+         write_files = true,
+         trace_file = "./Figures/scala_trace_basetest_IC_quick.png",
+         sample_file = "./data/scala_sample_basetest_IC_quick",
          get_sigma = read_sigma,
          mix = false
     )

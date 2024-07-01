@@ -35,9 +35,10 @@ metals.sbt
 /.ltximg/
 
 # Emacs rubbish
-#*
+\#*
 ~*
-.#*
+*~
+.\#*
 org-tex-*
 *~
-#*#
+\#*\#

@@ -36,6 +36,8 @@ burnin <- 0
 d <- 0
 #+end_src
 
+#+RESULTS:
+
 #+begin_src R :session example :results output :exports both
 r_IC_chain <- mcmc(sample_R_IC, thin=thinrate, start=0)
 r_MD_chain <- mcmc(sample_R_MD, thin=thinrate, start=0)
@@ -53,12 +55,12 @@ print(paste("The JAX (MD) minimum effective sample size is", min(effectiveSize(j
 #+end_src
 
 #+RESULTS:
-: [1] "The R (IC) average effective sample size is 2028.92884681784"
-: [1] "The R (MD) average effective sample size is 2492.79528011475"
-: [1] "The Scala (IC) average effective sample size is 621.826737847852"
-: [1] "The Scala (MD) average effective sample size is 1167.50446121078"
-: [1] "The JAX (IC) average effective sample size is 2132.52117854634"
-: [1] "The JAX (MD) average effective sample size is 2673.91351559329"
+: [1] "The R (IC) minimum effective sample size is 2028.92884681784"
+: [1] "The R (MD) minimum effective sample size is 2492.79528011475"
+: [1] "The Scala (IC) minimum effective sample size is 621.826737847852"
+: [1] "The Scala (MD) minimum effective sample size is 1167.50446121078"
+: [1] "The JAX (IC) minimum effective sample size is 2132.52117854634"
+: [1] "The JAX (MD) minimum effective sample size is 2673.91351559329"
 
 I definitely should be concerned about how much worse scala performed.
 
@@ -101,7 +103,7 @@ I should repeat everything with different PRNG and take averages to smooth thing
 
 Zooming in on the last segment,
 
-#+begin_src R :session example :results graphics file :file ./Figures/plot_mixing_full.png :height 600 :width 1200 :exports both
+#+begin_src R :session example :results graphics file :file ./Figures/plot_mixing_zoomed.png :height 600 :width 1200 :exports both
 b_vals_data <- data.frame(thinrate*(1:n), bvals_scala_IC, bvals_scala_MD,
                           bvals_jax_32_IC, bvals_jax_32_MD,
                           bvals_r_IC, bvals_r_MD) %>% slice(-(1:5000)) # remove the first data point cause R is funny
@@ -126,6 +128,41 @@ print(plot_mixing)
 #+end_src
 
 #+RESULTS:
-[[file:./Figures/plot_mixing_full.png]]
+[[file:./Figures/plot_mixing_zoomed.png]]
 
 We can see a very clear distinction between the MC group and the IC group, and very little difference in the performance of the languages, as we might hope!
+
+We can also plot the traces of these easily now!
+
+#+begin_src R :session example :results none
+df_SCALA_IC <- as.data.frame(sample_scala_IC)
+df_SCALA_MD <- as.data.frame(sample_scala_MD)
+df_JAX_IC   <- as.data.frame(sample_jax_32_IC)
+df_JAX_MD   <- as.data.frame(sample_jax_32_MD)
+df_R_IC     <- as.data.frame(sample_r_IC)
+df_R_MD     <- as.data.frame(sample_r_MD)
+
+df_SCALA_IC$chain <- "Scala_IC"
+df_SCALA_MD$chain <- "Scala_MD"
+df_JAX_IC$chain   <- "JAX_IC"
+df_JAX_MD$chain   <- "JAX_MD"
+df_R_IC$chain     <- "R_IC"
+df_R_MD$chain     <- "R_MD"
+
+df_chains <- bind_rows(df_SCALA_IC,df_SCALA_MD,df_JAX_IC,df_JAX_MD,df_R_IC,df_R_MD)
+df_chains <- cbind(thinrate*(1:n), df_chains)
+names(df_chains) <- c("j", paste("x",1:100, sep=""), "chain")
+#+end_src
+
+
+#+begin_src R :session example :results graphics file :file ~/RoamNotes/Figures/trace_plots.png :height 600 :width 600 :exports both
+trace_plots <- ggplot(df_chains) +
+  geom_line(aes(x = j, y = x1)) +
+  facet_grid(~chain)
+
+print(trace_plots)
+#+end_src
+
+#+RESULTS:
+[[file:~/RoamNotes/Figures/trace_plots.png]]
+welp scala definitely has different settings...

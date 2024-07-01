@@ -312,3 +312,40 @@ results[-1].x
  
 
 
+
+* Old compute sigma
+
+
+In order to get a better idea of how these implementations compare, we use the same chaotic variance matrix for both, with increasing submatrices, so we can make a graph of problem dimension, ~d~, against time.
+
+Firstly, here is a little python code to write out the matrix to a csv file, so both programs can read it, so we control the target variance;
+
+#+begin_src python :session example :results file
+import jax
+import jax.numpy as jnp
+import jax.random as rand
+import csv
+import numpy as np
+from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
+
+# keys for PRNG
+key = rand.PRNGKey(seed=1)
+
+d = 100
+
+# create a chaotic variance matrix to target
+M = rand.normal(key, shape = (d,d))
+sigma = inv(M @ M.T)
+
+with open('data/very_chaotic_variance.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerows(np.array(sigma))
+
+
+
+    
+'data/chaotic_variance.csv'
+#+end_src
+
+#+RESULTS:
+[[file:data/chaotic_variance.csv]]

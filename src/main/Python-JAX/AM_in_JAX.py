@@ -90,8 +90,7 @@ def adapt_step(state, q, r, mix, key):
                    keys[1])
     
     # Compute the log Hastings ratio
-    alpha = 0.5 * (x.T @ (solve(r, q.T @ x))
-                   - (prop.T @ solve(r, q.T @ prop)))
+    alpha = 0.5 * (x.T @ (solve(r, q.T @ x)) - (prop.T @ solve(r, q.T @ prop)))
                    
     return(try_accept(state, prop, alpha, mix, keys[2]))
 
@@ -341,7 +340,7 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
 
         lines = [
             f"compute_time_jax_{instance} <- {duration}",
-            f"sample_jax_{instance} <- matrix(c(" + ', '.join(map(str, sample[1].flatten())) + f"), ncol={d})",
+            f"sample_jax_{instance} <- matrix(c(" + ', '.join(map(str, sample[1].flatten())) + f"), ncol={d}, byrow=TRUE)",
             f"bvals_jax_{instance} <- c(" + b_values + ")"
         ]
                 
@@ -350,12 +349,9 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
                     f.write(line + "\n\n")
 
         print("Done!")
-            
-        # use np to sample the sample to the csv_file
-        # np.savetxt(csv_file, sample[1], delimiter=',')
 
         # plot the trace of the first coordinate
-        # plot_trace(sample[1], trace_file, 1)
+        #plot_trace(sample[1], trace_file, 0)
         
     return sample
 
