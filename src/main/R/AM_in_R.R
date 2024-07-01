@@ -61,8 +61,7 @@ adapt_step <- function(state, q, r, mix){
   }
   
   # Compute the log acceptance probability
-  alpha = 0.5 * (t(x) %*% (backsolve(r, t(q) %*% x))
-    - (t(prop) %*% backsolve(r, t(q) %*% prop)))
+  alpha = 0.5 * (t(x) %*% (backsolve(r, t(q) %*% x)) - (t(prop) %*% backsolve(r, t(q) %*% prop)))
   
   return(try_accept(state, prop, alpha, mix))
 }
@@ -98,7 +97,7 @@ mhead <- function(M, n=5)
   M[0:n,0:n]
 }
 
-plotter <- function(sample, filepath, d){
+trace_plot <- function(sample, filepath, d){
   
   y <- sapply(sample, function(i){i$x[d]})
 
@@ -268,7 +267,7 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
   
   end_time <- Sys.time()
   duration <- difftime(end_time, start_time, units="secs")
-  
+
   sigma_j <- sample[[n]]$prop_cov / (5.6644/d)
   acc_rate <- sample[[n]]$accept_count / (n*thinrate + burnin)
   
@@ -297,11 +296,11 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
       instance = "IC"
     }
 
-    samplestring = paste(lapply(sample, function(y){toString(y$x)}), collapse=', ')
+    samplestring = paste(sapply(sample, function(y){toString(y$x)}), collapse=', ')
 
     lines = c(
       paste("compute_time_r_", instance, " <- ", as.numeric(duration), sep=''),
-      paste("sample_r_", instance, " <- matrix(c(", samplestring, "), ncol=", d, ")", sep=''),
+      paste("sample_r_", instance, " <- matrix(c(", samplestring, "), ncol=", d, ", byrow=TRUE)", sep=''),
       paste("bvals_r_", instance, " <- c(", b_values, ")", sep='')
     )
 
@@ -310,8 +309,7 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
     print("Done!")
     
     # Plot the trace
-    # plotter(sample, trace_file, 1) 
-   
+    #trace_plot(sample, trace_file, 1) 
   }
   
   return(sample)
