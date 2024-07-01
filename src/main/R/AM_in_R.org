@@ -411,9 +411,13 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
   print(paste("The computation took", as.numeric(duration), "seconds"))
 
   if (write_files) {
-    
+
+    print("Computing the vector of b values...")
     b_values <- toString(lapply(lapply(sample, function(y){y$prop_cov}),
-                                function(y){sub_optim_factor(sigma, y)}))
+                                function(y){Re(sub_optim_factor(sigma, y))}))
+    print("Done!")
+    
+    print(paste("Saving to the file", sample_file, "..."))
 
     if (mix) {
       instance = "MD"
@@ -424,15 +428,17 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
     samplestring = paste(lapply(sample, function(y){toString(y$x)}), collapse=', ')
 
     lines = c(
-      paste("compute_time_R_", instance, " <- ", as.numeric(duration), sep=''),
-      paste("sample_R_", instance, " <- matrix(c(", samplestring, "), ncol=", d, ")", sep=''),
+      paste("compute_time_r_", instance, " <- ", as.numeric(duration), sep=''),
+      paste("sample_r_", instance, " <- matrix(c(", samplestring, "), ncol=", d, ")", sep=''),
       paste("bvals_r_", instance, " <- c(", b_values, ")", sep='')
     )
 
     cat(paste(lines, collapse = "\n\n"), file = sample_file)
+
+    print("Done!")
     
     # Plot the trace
-    plotter(sample, trace_file, 1) 
+    # plotter(sample, trace_file, 1) 
    
   }
   

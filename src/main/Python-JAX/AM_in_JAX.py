@@ -321,7 +321,12 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
         eff_func = lambda M: sub_optim_factor(sigma, M)
         eff_vectorised = jax.vmap(eff_func)
 
+        print("Computing the vector of b values...")
+        # b_values = ', '.join([str(f) for f in eff_vectorised(sample[3])])
         b_values = ', '.join(map(str, eff_vectorised(sample[3])))
+        print("Done!")
+        
+        print(f"Saving to the file {sample_file}...")
     
         if mix:
             if use_64:
@@ -337,18 +342,20 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
         lines = [
             f"compute_time_jax_{instance} <- {duration}",
             f"sample_jax_{instance} <- matrix(c(" + ', '.join(map(str, sample[1].flatten())) + f"), ncol={d})",
-            f"bvals_jax_{instance} <- c(" + ', '.join(map(str, b_values)) + ")"
+            f"bvals_jax_{instance} <- c(" + b_values + ")"
         ]
                 
         with open(sample_file, 'w') as f:
             for line in lines:
                     f.write(line + "\n\n")
+
+        print("Done!")
             
         # use np to sample the sample to the csv_file
         # np.savetxt(csv_file, sample[1], delimiter=',')
 
         # plot the trace of the first coordinate
-        plot_trace(sample[1], trace_file, 1)
+        # plot_trace(sample[1], trace_file, 1)
         
     return sample
 

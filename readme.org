@@ -222,7 +222,6 @@ r_times_laptop_MD <- cbind(1:100,read.csv("./data/R_compute_times_laptop_1_MD.cs
   mutate(proc = "R (MD)")
 names(r_times_laptop_MD) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")
 
-
 scala_times_laptop_IC <- cbind(1:100,read.csv("./data/scala_compute_times_laptop_1_IC.csv", header = FALSE)) %>%
   mutate(proc = "Scala (IC)")
 names(scala_times_laptop_IC) <- c("d","n", "thinrate", "burnin", "time", "b", "proc")

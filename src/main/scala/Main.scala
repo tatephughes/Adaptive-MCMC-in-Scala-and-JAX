@@ -325,9 +325,12 @@ object AdaptiveMetropolis:
     print("\nThe computation took " + duration + " seconds\n" )
 
     if (write_files) {
-      // This mess writes out the sample into a format to be read by R with "source("<filename>")"
 
+      print("Computing the vector of b values...\n")
       val b_values: String = sample.map(_.prop_cov).map(sub_optim_factor(sigma, _)).toArray.mkString(", ")
+      print("Done!\n")
+
+      print(s"Saving to the file $sample_file...\n")
 
       val instance = if (mix) {"MD"} else {"IC"}
       val samplestring = DenseMatrix(sample.map(_.x): _*).toArray.mkString(", ")
@@ -342,8 +345,10 @@ object AdaptiveMetropolis:
       writer.write(lines.mkString("\n\n"))
       writer.close()
 
+      print("Done!")
+
       // plot the trace of the first coordinate
-      plot_trace(sample.map(_.x), trace_file)
+      //plot_trace(sample.map(_.x), trace_file)
     }
   }
 
