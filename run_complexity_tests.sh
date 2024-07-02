@@ -12,8 +12,6 @@ echo "JAX output (IC, 64-bit): "
 echo "JAX output (MD, 64-bit): "
 ~/CPUJAX/bin/python -c 'import sys; sys.path.append("./src/main/Python-JAX/"); from AM_in_JAX import *; compute_time_graph(read_sigma(d=100), mix=True, csv_file="./data/JAX_64_compute_times_laptop_1_MD.csv", is_64_bit=True)'
 
-# Run R function
-
 echo "R output (IC): "
 Rscript -e 'source("./src/main/R/AM_in_R.R"); compute_time_graph(read_sigma(100), csv_file="./data/R_compute_times_laptop_1_IC.csv", mix=FALSE)'
 
