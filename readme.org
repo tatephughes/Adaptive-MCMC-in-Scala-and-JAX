@@ -219,7 +219,7 @@ We can now use ~ggplot~ to make a nice plot of this data.
 
 Putting the data together and plotting
 
-#+begin_src R :session example :results graphics file :file Figures/plot_complexity_laptop_1.png :width 1000 :exports both
+#+begin_src R :session example :results graphics file :file ./Figures/plot_complexity_laptop_1.png :width 1000 :exports both
 data <- rbind(jax_times_laptop_32_IC, jax_times_laptop_32_MD,
               jax_times_laptop_64_IC, jax_times_laptop_64_MD,
               r_times_laptop_IC, r_times_laptop_MD,
@@ -242,4 +242,4 @@ print(time_graph)
 #+end_src
 
 #+RESULTS:
-[[file:Figures/plot_complexity_laptop_1.png]]
+[[file:./Figures/plot_complexity_laptop_1.png]]
