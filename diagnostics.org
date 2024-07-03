@@ -155,7 +155,7 @@ names(df_chains) <- c("j", paste("x",1:100, sep=""), "chain")
 #+end_src
 
 
-#+begin_src R :session example :results graphics file :file ~/RoamNotes/Figures/trace_plots.png :height 600 :width 1200 :exports both
+#+begin_src R :session example :results graphics file :file ./Figures/trace_plots.png :height 600 :width 1200 :exports both
 library(forcats) # for fct_relevel
 trace_plots <- ggplot(df_chains) +
   geom_line(aes(x = j, y = x1, col=chain), size=0.2) +
@@ -170,5 +170,5 @@ print(trace_plots)
 #+end_src
 
 #+RESULTS:
-[[file:~/RoamNotes/Figures/trace_plots.png]]
-welp scala definitely has different settings...
+[[file:./Figures/trace_plots.png]]
+
