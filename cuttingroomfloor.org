@@ -349,3 +349,223 @@ with open('data/very_chaotic_variance.csv', 'w', newline='') as csvfile:
 
 #+RESULTS:
 [[file:data/chaotic_variance.csv]]
+
+* Mixing Tests (R)
+
+To test mixing, we compute ~b~ every 100 steps (reusing the thinning code) across a chain without burnin.
+
+#+begin_src R :session example :results none :tangle AM_in_R.R
+mixing_test <- function(sigma, n=10000, thinrate=1, mix = FALSE,
+                        csvfile = "./data/R_mixing_test.csv") {
+  
+  d = dim(sigma)[1]
+  
+  qr <- qr(sigma)
+  Q <- qr.Q(qr)
+  R <- qr.R(qr)
+
+  state <- list(j = 2, # starts at "2" for safety
+                x = rep(0,d),
+                x_mean = rep(0,d),
+                prop_cov = (0.1)^2*diag(d)/d,
+                accept_count = 0)
+
+  sample <- vector("list", n)
+
+  for (i in 1:n) {
+    state <- thinned_step(thinrate, state, Q, R, mix)
+    sample[[i]] <- state
+    if (i %% 1000 == 0) {
+      print(paste("main phase", 100*i/n, "% complete"))
+    }
+  }
+
+  prop_covs <- lapply(sample, function(y){y$prop_cov})
+  accept_rate <- sample[[n]]$accept_count / (n*thinrate)
+  
+  print(paste("The acceptance rate is ", accept_rate))
+  
+  b_vals <- cbind(1:n*thinrate,lapply(prop_covs, function(y){sub_optim_factor(sigma, y)}))
+
+  return(b_vals)
+
+  write.table(b_vals, csvfile, sep = ",", col.names = FALSE, row.names = FALSE)
+  
+}
+#+end_src
+
+* Mixing Tests (JAX)
+
+To test mixing speed, we can compute ~b~ across entire un-thinned chains without burn-in.
+
+#+begin_src python :session example :results none
+def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_test.csv"):
+    
+    sigma = get_sigma(d=100)
+    Q, R = qr(sigma) # take the QR decomposition of sigma
+    d = sigma.shape[0]
+    
+    n = 100
+
+    key = jax.random.PRNGKey(seed=1)
+
+    sample = main(d=d, n=n, thinrate=10000, burnin=0,
+                  file = "./Figures/adaptive_trace_JAX_mixing.png",
+                  mix=mix, get_sigma=lambda d:sigma[0:d,0:d])
+
+    print(sub_optim_factor(sigma, sample[3][-1]))
+    
+    eff_func = lambda M: sub_optim_factor(sigma, M)
+    eff_vectorised = jax.vmap(eff_func)
+    
+    b_values = eff_vectorised(sample[3])
+
+    y = jnp.column_stack((sample[0], b_values))
+    
+    with open(csvfile, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(y)
+
+#+end_src
+
+* JAX Tests (NOT UPDATED IN A LONG TIME)
+
+** Test Imports
+
+The test functions are out-of-date and no longer functional
+
+*************** TODO [#C] Update the tests for AM in JAX :projects:
+*************** END
+
+#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
+import matplotlib.pyplot as plt
+import jax.numpy as jnp
+import jax.lax as jl
+import jax.random as rand
+import jax.scipy.stats as stat
+from jax import vmap
+from jax.numpy.linalg import solve, qr, norm, eig, inv, cholesky
+import jax
+import time
+from AM_in_JAX import *
+#+end_src
+
+
+*** ~test_try_accept~ [OUT OF DATE]
+
+The below code block does a few tests on the ~try_accept~ function. If the tests pass, it will return ~True~, otherwise it will throw an error.
+
+#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
+def test_try_accept():
+    
+    d = 10
+    key = jax.random.PRNGKey(seed=2)
+    keys = rand.split(key,10000)
+    state0 = (0, jnp.zeros(10), jnp.zeros(10), jnp.identity(10), False)
+    prop = jnp.ones(10)
+    
+    '''
+    Test 1:
+    if alpha=log(0.5), then the function should accept approx. 50% of the proposals
+    '''
+    assert jnp.abs(jnp.mean(jl.map(lambda x: try_accept(state0, prop, jnp.log(0.5), x), keys)[4]) - 0.5 < 0.1), "Accepting at unexpected rate"
+
+    '''
+    Test 1.5:
+    if alpha=-0.33333333, then the function should accept approx. 0.7165 of the proposals
+    '''
+    assert jnp.abs(jnp.mean(jl.map(lambda x: try_accept(state0, prop, -0.3333333, x), keys)[4]) - 0.7165 < 0.1), "Accepting at unexpected rate"
+
+    '''
+    Test 2:
+    if alpha=log(0)=-inf, then the function should never accept, and should return the
+    proposed value
+    '''
+    assert jnp.all(try_accept(state0, prop, jnp.log(0), key)[1]==jnp.zeros(10)), "Not rejecting proposal"
+
+    '''
+    Test 3:
+    if alpha=log(1)=0 then the function should always accept, and should return the
+    proposed value
+    '''
+    assert jnp.all(try_accept(state0, prop, jnp.log(1), key)[1]==prop), "Not accepting proposal"
+
+    '''
+    Test 4:
+    No matter what, j should increment by exactly 1
+    '''
+    assert jnp.all(jl.map(lambda x: try_accept(state0, prop, jnp.log(0.5), x), keys)[0]==1), "Index not correctly implemented"
+
+    '''
+    Test 5:
+    When it accepts, the x_sum should increase accordingly
+    '''
+    assert jnp.all(try_accept(state0, prop, jnp.log(1), key)[2]==prop), "Not increased x_sum"
+    assert jnp.all(try_accept(state0, prop, jnp.log(0), key)[2]==jnp.zeros(10)), "Not increased x_sum"
+
+    '''
+    Test 6:
+    When it accepts, the xxt_sum should increase accordingly
+    '''
+    assert jnp.all(try_accept(state0, prop, jnp.log(1), key)[3]==jnp.identity(10) + jnp.outer(prop, prop)), "Not increased xxt_sum"
+    assert jnp.all(try_accept(state0, prop, jnp.log(0), key)[3]==jnp.identity(10)), "Not increased xxt_sum"
+
+    return True
+#+end_src
+
+
+
+*** ~test_adapt_step~ [OUT OF DATE]
+
+#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
+def test_adapt_step():
+
+    d = 2
+    n = 100000
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    # this state was chosen being close to an actual state of the adaptive chain
+    state = (100, jnp.zeros(2), jnp.array([-80.0,-5.0]), jnp.array([[260.0,100.0],[100.0,150.0]]), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+    
+    '''
+    Test 1:
+    From a (hypothetical) progressed point, the result should be approximately distributed with a N(0,sigma) distribution.
+    '''
+    def step(carry, _):
+        nextstate = adapt_step(carry, Q, R, keys[carry[0]])[0]
+        return(nextstate, nextstate)
+    
+    assert norm(cov(jl.scan(step, state, jnp.zeros(n))[1][1]) - sigma) < 0.2, "adap_step not producing sample sufficiently close to the target distribution"
+
+    
+    return True
+#+end_src
+
+
+*** ~test_thinned_step~
+
+#+begin_src python :session example :results none :tangle AM_in_JAX_tests.py
+def test_thinned_step():
+
+    d = 2
+    n = 1000
+    thinrate = 10
+    key = jax.random.PRNGKey(seed=1)
+    keys = rand.split(key,n)
+    # this state was chosen being close to an actual state of the adaptive chain
+    state = (100, jnp.zeros(2), jnp.array([-80.0,-5.0]), jnp.array([[260.0,100.0],[100.0,150.0]]), False)
+    sigma = jnp.array([[2.0,1.0],[1.0,2.0]])
+    Q, R = qr(sigma)
+    
+    '''
+    Test 1:
+    the index of a state should increase by thinrate
+    '''
+    assert (thinned_step(thinrate, state, Q, R, keys[0])[0] == 100+thinrate), "thinned_step not correctly incrementing step count"
+
+    return True
+  
+#+end_src
+

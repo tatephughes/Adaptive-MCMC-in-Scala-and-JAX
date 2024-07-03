@@ -8,13 +8,13 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "Adaptive MCMC in Scala",
-    version := "0.5.0",
+    version := "0.6.0",
 
     scalaVersion := scala3Version,
 
-    javaOptions ++= Seq(
-      "-Djava.library.path=/usr/lib/libopenblas.so"
-    ),
+    //javaOptions ++= Seq(
+    //  "-Djava.library.path=/usr/lib/libopenblas.so"
+    //),
 
     libraryDependencies  ++= Seq(
       "org.scalatest" %% "scalatest" % "3.2.14" % "test",

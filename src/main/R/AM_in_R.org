@@ -301,50 +301,6 @@ read_sigma <- function(d) {
 } 
 #+end_src
 
-* Mixing Tests (redundant)
-
-To test mixing, we compute ~b~ every 100 steps (reusing the thinning code) across a chain without burnin.
-
-#+begin_src R :session example :results none :tangle AM_in_R.R
-mixing_test <- function(sigma, n=10000, thinrate=1, mix = FALSE,
-                        csvfile = "./data/R_mixing_test.csv") {
-  
-  d = dim(sigma)[1]
-  
-  qr <- qr(sigma)
-  Q <- qr.Q(qr)
-  R <- qr.R(qr)
-
-  state <- list(j = 2, # starts at "2" for safety
-                x = rep(0,d),
-                x_mean = rep(0,d),
-                prop_cov = (0.1)^2*diag(d)/d,
-                accept_count = 0)
-
-  sample <- vector("list", n)
-
-  for (i in 1:n) {
-    state <- thinned_step(thinrate, state, Q, R, mix)
-    sample[[i]] <- state
-    if (i %% 1000 == 0) {
-      print(paste("main phase", 100*i/n, "% complete"))
-    }
-  }
-
-  prop_covs <- lapply(sample, function(y){y$prop_cov})
-  accept_rate <- sample[[n]]$accept_count / (n*thinrate)
-  
-  print(paste("The acceptance rate is ", accept_rate))
-  
-  b_vals <- cbind(1:n*thinrate,lapply(prop_covs, function(y){sub_optim_factor(sigma, y)}))
-
-  return(b_vals)
-
-  write.table(b_vals, csvfile, sep = ",", col.names = FALSE, row.names = FALSE)
-  
-}
-#+end_src
-
 * ~main~
 
 #+begin_src R :session example :results none :tangle AM_in_R.R
@@ -423,16 +379,25 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
 
     samplestring = paste(sapply(sample, function(y){toString(y$x)}), collapse=', ')
 
+    results_func = paste("output_results <- function(){",
+                            "chain_r_{instance} <- mcmc(sample_r_", instance, "thin=", thinrate, "start=0); min_ess <- min(effectiveSize(chain_r_", instance")); print(paste('The optimal sampling value of x_1 is', ", sigma[1,1], " * (5.6644/", d, "))); print(paste('The actual sampling value of x_1 is', ", sigma_j[0,0], " * (5.6644/", d, "))); print(paste('The initial b value is', b1_r_", instance, ")); print(paste('The final b value is', b_vals_r_", instance, "[-1])); print(paste('The acceptance rate is', acc_rate_r_", instance, ")); print(paste('The computation took', compute_time_r_ ", instance, ", 'seconds')); print(paste('The minimum Effective Sample Size is', min_ess)); print(paste('The minimum ESS per second is', min_ess/compute_time_r_", instance, "}))",
+                            "}")
+    
     lines = c(
+      "library(coda)",
+      paste("b1_r", instance, " <- ", b1, sep=''),
+      paste("acc_rate_r_", instance, " <- ", acc_rate, sep=''),
       paste("compute_time_r_", instance, " <- ", as.numeric(duration), sep=''),
       paste("sample_r_", instance, " <- matrix(c(", samplestring, "), ncol=", d, ", byrow=TRUE)", sep=''),
-      paste("bvals_r_", instance, " <- c(", b_values, ")", sep='')
+      paste("bvals_r_", instance, " <- c(", b_values, ")", sep=''),
+      results_func
     )
 
     cat(paste(lines, collapse = "\n\n"), file = sample_file)
 
     print("Done!")
-    
+
+            # Plotting has been moved over to be external, see diagnostics.org
     # Plot the trace
     #trace_plot(sample, trace_file, 1) 
   }

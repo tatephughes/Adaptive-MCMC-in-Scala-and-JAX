@@ -18,6 +18,8 @@ import breeze.linalg.{CSCMatrix, csvwrite}
 // randombasis and seed for PRNG
 implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(41L)))
 
+
+
 // A class for the state of the chaining
 // TODO add ~is_accepted~ as a element
 case class AM_state(j: Double, 
@@ -39,11 +41,32 @@ extension[T](ll: LazyList[T]){
 }
 
 
-object AdaptiveMetropolis:
+object AdaptiveMetropolis {
+
+  import dev.ludovic.netlib.blas.BLAS.{ getInstance => blas }
 
   // Short-hand for two commonly used types
   type dm = DenseMatrix[Double]
   type dv = DenseVector[Double]
+
+  /**
+   * Backsolve an upper-triangular linear system
+   * with a single RHS
+   *
+   * @param A An upper-triangular matrix
+   * @param y A single vector RHS
+   *
+   * @return The solution, x, of the linear system A x = y
+   *
+   * Credit: Darren Wilkinson, https://github.com/darrenjw/scala-glm
+   */
+  def backSolve(A: dm,
+    y: dv): dv = {
+    val yc = y.copy
+    blas.dtrsv("U", "N", "N", A.cols, A.toArray,
+      A.rows, yc.data, 1)
+    yc
+  }
 
   def plot_trace(sample: Array[dv], // the sample to plot
                file_path: String  // file to save to
@@ -113,7 +136,7 @@ object AdaptiveMetropolis:
   def adapt_step(state: AM_state, // The state of the chain
                  q: dm, r: dm,    // The QR-decomposition of the target Covariance
                  prog: Boolean,   // Flag for whether to print diagnositcs to console
-                 mix: Boolean     // Whether to use the MP version of the algorithm
+                 mix: Boolean     // Whether to use the MD version of the algorithm
     ): AM_state = {
 
     /* Samples from the current proposal distribution and computes the log
@@ -146,8 +169,18 @@ object AdaptiveMetropolis:
     }
 
     // The log Hastings Ratio (backSolve isn't exposed in breeze, but i seem to get much worse performance with it for some reason?)
-    val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (prop.t * (r \ (q.t * prop))))
-    //val alpha = 0.5 * ((x.t * backSolve(r, q.t * x))) - (prop.t * backSolve(r, q.t * prop))
+    //val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (prop.t * (r \ (q.t * prop))))
+    val alpha = 0.5 * ((x.t * backSolve(r, (q.t * x))) - (prop.t * backSolve(r, (q.t * prop))))
+    //val alpha2 = 0.5 * ((x.t * backSolve(r, q.t * x))) - (prop.t * backSolve(r, q.t * prop))
+
+    //val num1 = (x.t * (r \ (q.t * x)))
+    //val num2 = (x.t * backSolve(r, q.t * x))
+
+    //val num1 = (prop.t * (r \ (q.t * prop)))
+    //val num2 = (prop.t * backSolve(r, q.t * prop))
+
+    //println(s"\n$alpha")
+    //println(s"$alpha2\n")
 
     return(try_accept(state, prop, alpha, mix))
 
@@ -350,6 +383,7 @@ object AdaptiveMetropolis:
 
       val x_sample = sample.map(_.x)
 
+        // Plotting has been moved over to be external, see diagnostics.org
       // plot the trace of the first coordinate
       //plot_trace(sample.map(_.x), trace_file)
     }
@@ -358,12 +392,13 @@ object AdaptiveMetropolis:
   @main def quick_run(): Unit = {
 
     main(d=3, n=1000, thinrate=1, burnin=0,
-         write_files = true,
+         write_files = false,
          trace_file = "./Figures/scala_trace_basetest_IC.png",
          sample_file = "./data/scala_sample_quickrun",
          get_sigma = read_sigma,
          mix = false
     )
+
   }
 
   @main def simple_run_IC(): Unit = {
@@ -412,3 +447,4 @@ object AdaptiveMetropolis:
       "./data/scala_compute_times_laptop_1_MD.csv")
 
   }
+}

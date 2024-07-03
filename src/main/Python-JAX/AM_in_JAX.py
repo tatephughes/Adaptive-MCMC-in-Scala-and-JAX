@@ -9,7 +9,6 @@ from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
 from jax.scipy.linalg import solve_triangular
 import numpy as np
 import time
-from AM_in_JAX_tests import *
 import csv
 import os
 import re
@@ -230,33 +229,6 @@ def read_sigma(d, file_path = './data/very_chaotic_variance.csv'):
             matrix.append([float(item) for item in row])
     return jnp.array(matrix)[0:d,0:d]
 
-def mixing_test(get_sigma = read_sigma, mix = False, csvfile = "./data/mixing_test.csv"):
-    
-    sigma = get_sigma(d=100)
-    Q, R = qr(sigma) # take the QR decomposition of sigma
-    d = sigma.shape[0]
-    
-    n = 100
-
-    key = jax.random.PRNGKey(seed=1)
-
-    sample = main(d=d, n=n, thinrate=10000, burnin=0,
-                  file = "./Figures/adaptive_trace_JAX_mixing.png",
-                  mix=mix, get_sigma=lambda d:sigma[0:d,0:d])
-
-    print(sub_optim_factor(sigma, sample[3][-1]))
-    
-    eff_func = lambda M: sub_optim_factor(sigma, M)
-    eff_vectorised = jax.vmap(eff_func)
-    
-    b_values = eff_vectorised(sample[3])
-
-    y = jnp.column_stack((sample[0], b_values))
-    
-    with open(csvfile, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerows(y)
-
 def main(d=10, n=1000, thinrate=1000, burnin=0,
          write_files = False,
          trace_file = "./Figures/adaptive_trace_JAX_test.png",
@@ -319,7 +291,7 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
 
         eff_func = lambda M: sub_optim_factor(sigma, M)
         eff_vectorised = jax.vmap(eff_func)
-
+        
         print("Computing the vector of b values...")
         # b_values = ', '.join([str(f) for f in eff_vectorised(sample[3])])
         b_values = ', '.join(map(str, eff_vectorised(sample[3])))
@@ -338,10 +310,18 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
             else:
                 instance = "32_IC"
 
+        results_func = ''.join(("output_results <- function(){",
+                            f"chain_jax_{instance} <- mcmc(sample_jax_{instance}, thin={thinrate}, start=0); min_ess <- min(effectiveSize(chain_jax_{instance})); print(paste('The optimal sampling value of x_1 is', {sigma[0,0]} * (5.6644/{d}))); print(paste('The actual sampling value of x_1 is', {sigma_j[0,0]} * (5.6644/{d}))); print(paste('The initial b value is', b1_jax_{instance})); print(paste('The final b value is', b_vals_jax_{instance}[-1])); print(paste('The acceptance rate is', acc_rate_jax_{instance})); print(paste('The computation took', compute_time_jax_{instance}, 'seconds')); print(paste('The minimum Effective Sample Size is', min_ess)); print(paste('The minimum ESS per second is', min_ess/compute_time_jax_{instance}))",
+                            "}"))
+
         lines = [
+            "library(coda)",
+            f"b1_jax_{instance} <- {b1}",
+            f"acc_rate_jax_{instance} <- {acc_rate}",
             f"compute_time_jax_{instance} <- {duration}",
             f"sample_jax_{instance} <- matrix(c(" + ', '.join(map(str, sample[1].flatten())) + f"), ncol={d}, byrow=TRUE)",
-            f"bvals_jax_{instance} <- c(" + b_values + ")"
+            f"b_vals_jax_{instance} <- c(" + b_values + ")",
+            results_func
         ]
                 
         with open(sample_file, 'w') as f:
@@ -350,6 +330,7 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
 
         print("Done!")
 
+        # Plotting has been moved over to be external, see diagnostics.org
         # plot the trace of the first coordinate
         #plot_trace(sample[1], trace_file, 0)
         
@@ -367,13 +348,5 @@ if __name__ == "__main__":
             print("Succesfully found working directory")
     else:
         print("In correct working directory")
-    
-    #sample = main(file = "./Figures/adaptive_trace_JAX_test.png", mix = True, get_sigma=read_sigma)
-
-    #compute_time_graph(read_sigma(d=10), "data/JAX_64bit_compute_times_laptop_test.csv")
-    #mixing_test(read_sigma, mix=True,
-    #            csvfile = "./data/so_factor_mixing.csv")
-    #mixing_test(read_sigma, mix=False,
-    #            csvfile = "./data/so_factor_not_mixing.csv")
 
     sample = main(d=10, n=1000, thinrate=1000, burnin=0, mix=False)

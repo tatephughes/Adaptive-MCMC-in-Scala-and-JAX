@@ -36,10 +36,12 @@ A AMRTH step is defined as follows;
 - If $j>2d$, we use the proposal $q(\vec X_t^* \mid \vec X_0, \dots, X_{t-1}) \sim \mathcal N_d (\vec X_{t-1}, \mat C_j)$, where $C_j$ is the current sampling covariance, updated as below.
   
 We can compute the empirical covariance matrix at step $j$ by
+
 \begin{align*}
 \vec{\overline{X}}_t &= \frac{t-1}{t} \vec{\overline{X}}_{t-1} + \frac{1}{t} \vec X_t, \\
 \mat C_{t+1} &= \frac{t-1}{t} \mat C_t + \frac{s_d}{t}(t\vec{\overline{X}}_{t-1}\vec{\overline{X}}_{t-1}^{\intercal} - (t+1)\vec{\overline{X}}_t\vec{\overline{X}}_t^{\intercal} + \vec X_t\vec X_t^{\intercal} + \epsilon \mat I_d),\quad t\geq t_0.
 \end{align*}
+
 The logic I'm using is to carry forward $\vec{\overline x}$ and $C_j$ (as well as the current index, $j$) as part of our 'chain', in order to sample from the proposal.
 
 ** Measure of effectiveness
@@ -160,11 +162,11 @@ We can also plot out the sub optimality factor of each of these;
 
 #+CAPTION: Sub-Optimality Factor accross all 1,000,000 iterations
 #+NAME: fig:
-[[file:/home/tate/MyProjects/Adaptive-MCMC-in-Scala-and-JAX/Figures/plot_mixing_full.png]]
+[[file:./Figures/plot_mixing_full.png]]
 
 #+CAPTION: Sub-Optimality Factor across the last 500,000 iterations
 #+NAME: fig:
-[[file:/home/tate/MyProjects/Adaptive-MCMC-in-Scala-and-JAX/Figures/plot_mixing_zoomed.png]]
+[[file:./Figures/plot_mixing_zoomed.png]]
 
 We can see a very clear difference in the performance of the two algorithms; I must say the performance of IC is concerning me a bit, I expected them to perform somewhat similarly.
 
@@ -221,15 +223,15 @@ Putting the data together and plotting
 data <- rbind(jax_times_laptop_32_IC, jax_times_laptop_32_MD,
               jax_times_laptop_64_IC, jax_times_laptop_64_MD,
               r_times_laptop_IC, r_times_laptop_MD,
-              scala_times_laptop_IC_ #, scala_times_laptop_MD)
+              scala_times_laptop_IC) #, scala_times_laptop_MD)
 
 #data <- rbind(r_times_laptop_IC, jax_times_laptop_32_MD)
 
 time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
   geom_line(size = 2) +
-  scale_color_manual(values = c("JAX32 (IC)" = "red", "JAX32 (MD)" = "pink",
-                                "JAX64 (IC)" = "#E69F00", "JAX64 (MD)" = "#D55E00",
-                                "Scala (IC)" = "blue", "Scala (MD)" = "#56B4E9",
+  scale_color_manual(values = c("JAX32 (IC)" = "darkred", "JAX32 (MD)" = "#FF7377",
+                                "JAX64 (IC)" = "#D55E00", "JAX64 (MD)" = "#E69F00",
+                                "Scala (IC)" = "darkblue", "Scala (MD)" = "#56B4E9",
                                 "R (IC)" = "darkgreen", "R (MD)" = "#009E73")) +
   theme_minimal() + 
   labs(title = "Compute Time against Dimension (Intel core i7 12700H, 16Gb RAM, Arch Linux)",
@@ -239,4 +241,5 @@ time_graph <- ggplot(data, aes(x = d, y = time, color = proc)) +
 print(time_graph)
 #+end_src
 
-I have yet to properly re-run this.
+#+RESULTS:
+[[file:Figures/plot_complexity_laptop_1.png]]
