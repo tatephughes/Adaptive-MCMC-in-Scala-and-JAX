@@ -445,4 +445,27 @@ object AdaptiveMetropolis {
       "./data/scala_compute_times_laptop_1_MD.csv")
 
   }
+
+  @main def complexity_run_openBlas(): Unit = {
+
+    compute_time_graph(read_sigma(100), false,
+      "./data/scala_compute_times_laptop_1_openBlas.csv")
+
+  }
+
+  @main def complexity_run_javaBlas(): Unit = {
+
+    compute_time_graph(read_sigma(100), false,
+      "./data/scala_compute_times_laptop_1_javaBlas.csv")
+
+  }
+
+  @main def complexity_run_nativeBlas(): Unit = {
+
+    compute_time_graph(read_sigma(100), false,
+      "./data/scala_compute_times_laptop_1_nativeBlas.csv")
+
+  }
+
 }
+
