@@ -1,5 +1,3 @@
-//import com.github.fommil.netlib.BLAS
-import dev.ludovic.netlib.blas.NativeBLAS
 import breeze.plot._
 import breeze.linalg._
 import breeze.numerics._
@@ -288,7 +286,7 @@ object AdaptiveMetropolis {
   def generate_sigma(d:Int): dm = {
 
     val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
-    val M = DenseMatrix(data: _*)
+    val M = DenseMatrix(data*)
     val sigma = M.t * M
 
     return(sigma)
@@ -308,7 +306,7 @@ object AdaptiveMetropolis {
     val numCols = data.head.length
 
     // Creating the DenseMatrix
-    val sigma = DenseMatrix(data: _*).reshape(numRows, numCols)
+    val sigma = DenseMatrix(data*).reshape(numRows, numCols)
 
     return(sigma(0 until d, 0 until d))
 
@@ -367,7 +365,7 @@ object AdaptiveMetropolis {
       print(s"Saving to the file $sample_file...\n")
 
       val instance = if (mix) {"MD"} else {"IC"}
-      val samplestring = DenseMatrix(sample.map(_.x): _*).toArray.mkString(", ")
+      val samplestring = DenseMatrix(sample.map(_.x)*).toArray.mkString(", ")
 
       val lines: Seq[String] = Seq(
         s"compute_time_scala_$instance <- $duration",
