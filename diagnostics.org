@@ -62,8 +62,6 @@ print(paste("The JAX (MD) minimum effective sample size is", min(effectiveSize(j
 : [1] "The JAX (IC) minimum effective sample size is 622.864901785441"
 : [1] "The JAX (MD) minimum effective sample size is 1271.31786979535"
 
-I definitely should be concerned about how much worse scala performed.
-
 #+begin_src R :session example :results graphics file :file ./Figures/plot_mixing_full.png :height 600 :width 1200 :exports both
 library(ggplot2)
 library(dplyr)
