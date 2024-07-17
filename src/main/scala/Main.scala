@@ -4,6 +4,7 @@ import breeze.numerics._
 import breeze.stats.distributions._
 import breeze.stats.distributions.Gaussian
 import org.apache.commons.math3.random.MersenneTwister
+import breeze.stats.distributions.Rand.VariableSeed.randBasis
 import java.awt.Color
 import java.io.PrintWriter
 import reflect.Selectable.reflectiveSelectable
@@ -14,9 +15,7 @@ import breeze.linalg.{CSCMatrix, csvwrite}
 
 
 // randombasis and seed for PRNG
-implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(41L)))
-
-
+//implicit val randBasis: RandBasis = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(41L)))
 
 // A class for the state of the chaining
 // TODO add ~is_accepted~ as a element
@@ -387,83 +386,53 @@ object AdaptiveMetropolis {
     }
   }
 
-  @main def quick_run(): Unit = {
+  @main def quick_run(args: String*): Unit = {
 
     main(d=3, n=1000, thinrate=1, burnin=0,
          write_files = false,
          trace_file = "./Figures/scala_trace_basetest_IC.png",
          sample_file = "./data/scala_sample_quickrun",
-         get_sigma = read_sigma,
+         get_sigma = generate_sigma,
          mix = false
     )
 
   }
 
-  @main def simple_run_IC(): Unit = {
+  @main def simple_run_IC(args: String*): Unit = {
 
     main(d=100, n=10000, thinrate=100, burnin=0,
          write_files = true,
-         trace_file = "./Figures/scala_trace_basetest_IC.png",
-         sample_file = "./data/scala_sample_basetest_IC",
+         trace_file = args(0),
+         sample_file = args(1),
          get_sigma = read_sigma,
          mix = false
     )
   }
 
-  @main def simple_run_IC_quick(): Unit = {
-
-    main(d=10, n=10000, thinrate=100, burnin=0,
-         write_files = true,
-         trace_file = "./Figures/scala_trace_basetest_IC_quick.png",
-         sample_file = "./data/scala_sample_basetest_IC_quick",
-         get_sigma = read_sigma,
-         mix = false
-    )
-  }
-
-  @main def simple_run_MD(): Unit = {
+  @main def simple_run_MD(args: String*): Unit = {
 
     main(d=100, n=10000, thinrate=100, burnin=0,
          write_files = true,
-         trace_file = "./Figures/scala_trace_basetest_MD.png",
-         sample_file = "./data/scala_sample_basetest_MD",
+         trace_file = args(0),
+         sample_file = args(1),
          get_sigma = read_sigma,
          mix = true
     )
   }
 
-  @main def complexity_run_IC(): Unit = {
+  @main def complexity_run_IC(args: String*): Unit = {
 
-    compute_time_graph(read_sigma(100), false,
-      "./data/scala_compute_times_laptop_1_IC.csv")
+    println(args)
+
+    compute_time_graph(read_sigma(args(1).toInt), false,
+      args(0))
 
   }
 
-  @main def complexity_run_MD(): Unit = {
+  @main def complexity_run_MD(args: String*): Unit = {
 
-    compute_time_graph(read_sigma(100), true,
+    compute_time_graph(read_sigma(args(1).toInt), true,
       "./data/scala_compute_times_laptop_1_MD.csv")
-
-  }
-
-  @main def complexity_run_openBlas(): Unit = {
-
-    compute_time_graph(read_sigma(100), false,
-      "./data/scala_compute_times_laptop_1_openBlas.csv")
-
-  }
-
-  @main def complexity_run_javaBlas(): Unit = {
-
-    compute_time_graph(read_sigma(100), false,
-      "./data/scala_compute_times_laptop_1_javaBlas.csv")
-
-  }
-
-  @main def complexity_run_nativeBlas(): Unit = {
-
-    compute_time_graph(read_sigma(100), false,
-      "./data/scala_compute_times_laptop_1_nativeBlas.csv")
 
   }
 
