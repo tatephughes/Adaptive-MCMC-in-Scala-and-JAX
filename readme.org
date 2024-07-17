@@ -84,8 +84,6 @@ My Scala implementation of this is found in ~Main.scala~ (it needs cleanup thoug
   
 The ~run~ function then tests this, using ~d=10~, ~n=100000~, ~burnin=100000~ and ~thinrate=10~. This function, once it finishes, prints out the true variance of $x_1$, the empirical estimate of it from the sample, the $b$ value, and the time the computation took. A trace plot of $x_1$ is also saved to ~Figures/adaptive_trace_scala.png~.
 
-*** TODO Properly Document and Comment the Scala code :projects:
-
 * JAX implementation
 
 As you might imagine, the JAX implentation is very similar, even if it is a bit more fragmented. The ~AM_step~ function is split into twofunctions, ~try_accept~, and ~adapt_step~. This is mainly due to the way JAX handles ~if else~ statements, making this seem like the convenient way to do it.
