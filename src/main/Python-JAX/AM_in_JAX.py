@@ -236,7 +236,8 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
          mix = False,
          eps = 0.01,
          get_sigma = read_sigma,
-         use_64 = False):
+         use_64 = False,
+         seed=1):
 
     """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.I
     """
@@ -246,7 +247,7 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
     # the actual number of iterations is n*thin + burnin
 
     # keys for PRNG
-    key = jax.random.PRNGKey(seed=1)
+    key = jax.random.PRNGKey(seed=seed)
     keys = rand.split(key, n + burnin + 1)
     
     sigma = get_sigma(d=d)

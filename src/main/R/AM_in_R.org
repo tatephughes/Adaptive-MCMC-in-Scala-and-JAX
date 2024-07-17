@@ -310,8 +310,11 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
                  trace_file="./Figures/trace_plot.png",
                  sample_file = "./data/r_sample",
                  get_sigma = read_sigma,
-                 prog=FALSE){
+                 prog=FALSE,
+                 seed=1){
 
+  set.seed(seed)
+  
   numits <- n*thinrate + burnin
 
   sigma <- get_sigma(d)
@@ -380,7 +383,7 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
     samplestring = paste(sapply(sample, function(y){toString(y$x)}), collapse=', ')
 
     results_func = paste("output_results <- function(){",
-                            "chain_r_{instance} <- mcmc(sample_r_", instance, "thin=", thinrate, "start=0); min_ess <- min(effectiveSize(chain_r_", instance")); print(paste('The optimal sampling value of x_1 is', ", sigma[1,1], " * (5.6644/", d, "))); print(paste('The actual sampling value of x_1 is', ", sigma_j[0,0], " * (5.6644/", d, "))); print(paste('The initial b value is', b1_r_", instance, ")); print(paste('The final b value is', b_vals_r_", instance, "[-1])); print(paste('The acceptance rate is', acc_rate_r_", instance, ")); print(paste('The computation took', compute_time_r_ ", instance, ", 'seconds')); print(paste('The minimum Effective Sample Size is', min_ess)); print(paste('The minimum ESS per second is', min_ess/compute_time_r_", instance, "}))",
+                            "chain_r_{instance} <- mcmc(sample_r_", instance, "thin=", thinrate, "start=0); min_ess <- min(effectiveSize(chain_r_", instance, ")); print(paste('The optimal sampling value of x_1 is', ", sigma[1,1], " * (5.6644/", d, "))); print(paste('The actual sampling value of x_1 is', ", sigma_j[0,0], " * (5.6644/", d, "))); print(paste('The initial b value is', b1_r_", instance, ")); print(paste('The final b value is', b_vals_r_", instance, "[-1])); print(paste('The acceptance rate is', acc_rate_r_", instance, ")); print(paste('The computation took', compute_time_r_ ", instance, ", 'seconds')); print(paste('The minimum Effective Sample Size is', min_ess)); print(paste('The minimum ESS per second is', min_ess/compute_time_r_", instance, "}))",
                             "}")
     
     lines = c(
