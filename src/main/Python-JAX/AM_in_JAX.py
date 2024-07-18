@@ -231,7 +231,6 @@ def read_sigma(d, file_path = './data/very_chaotic_variance.csv'):
 
 def main(d=10, n=1000, thinrate=1000, burnin=0,
          write_files = False,
-         trace_file = "./Figures/adaptive_trace_JAX_test.png",
          sample_file = "./data/jax_sample",
          mix = False,
          eps = 0.01,
@@ -239,7 +238,7 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
          use_64 = False,
          seed=1):
 
-    """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.I
+    """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.
     """
 
     jax.config.update('jax_enable_x64', use_64)
@@ -332,8 +331,6 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
         print("Done!")
 
         # Plotting has been moved over to be external, see diagnostics.org
-        # plot the trace of the first coordinate
-        #plot_trace(sample[1], trace_file, 0)
         
     return sample
 

@@ -188,7 +188,6 @@ read_sigma <- function(d) {
 main <- function(d=10, n=1000, thinrate=1000, burnin=0,
                  mix=FALSE,
                  write_files = FALSE, # whether to write out to files
-                 trace_file="./Figures/trace_plot.png",
                  sample_file = "./data/r_sample",
                  get_sigma = read_sigma,
                  prog=FALSE,
@@ -282,8 +281,7 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
     print("Done!")
 
             # Plotting has been moved over to be external, see diagnostics.org
-    # Plot the trace
-    #trace_plot(sample, trace_file, 1) 
+    
   }
   
   return(sample)

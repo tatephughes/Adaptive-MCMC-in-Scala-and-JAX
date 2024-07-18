@@ -27,11 +27,8 @@ sbt "runMain complexity_run_IC ./data/scala_compute_times_laptop_1_IC.csv 100"
 echo "Scala output (MD): "
 sbt "runMain complexity_run_MD ./data/scala_compute_times_laptop_1_MD.csv 100"
 
-#echo "Scala openBlas"
-#sbt -Ddev.ludovic.netlib.blas.nativeLib=libopenblas.so "runMain complexity_run_openBlas ./data/scala_compute_times_laptop_1_IC.csv"
-#
 #echo "Scala Java Blas"
-#sbt -Ddev.ludovic.netlib.blas.nativeLib=libopenblasobutnot "runMain complexity_run_javaBlas"
+#sbt -Ddev.ludovic.netlib.blas.nativeLib=libopenblasobutnot "runMain complexity_run_IC ./data/scala_compute_times_laptop_javablas.csv 50"
 #
 #echo "Scala Native Blas"
-#sbt -Ddev.ludovic.netlib.blas.nativeLib=libblas.so "runMain complexity_run_nativeBlas"
+#sbt -Ddev.ludovic.netlib.blas.nativeLib=libblas.so "runMain complexity_run_IC ./data/scala_compute_times_laptop_nativeblas.csv 50"

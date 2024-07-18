@@ -165,19 +165,9 @@ object AdaptiveMetropolis {
       MultivariateGaussian(x, prop_cov).draw()
     }
 
-    // The log Hastings Ratio (backSolve isn't exposed in breeze, but i seem to get much worse performance with it for some reason?)
-    //val alpha = 0.5 * ((x.t * (r \ (q.t * x))) - (prop.t * (r \ (q.t * prop))))
+    // The log Hastings Ratio
     val alpha = 0.5 * ((x.t * backSolve(r, (q.t * x))) - (prop.t * backSolve(r, (q.t * prop))))
-    //val alpha2 = 0.5 * ((x.t * backSolve(r, q.t * x))) - (prop.t * backSolve(r, q.t * prop))
 
-    //val num1 = (x.t * (r \ (q.t * x)))
-    //val num2 = (x.t * backSolve(r, q.t * x))
-
-    //val num1 = (prop.t * (r \ (q.t * prop)))
-    //val num2 = (prop.t * backSolve(r, q.t * prop))
-
-    //println(s"\n$alpha")
-    //println(s"$alpha2\n")
 
     return(try_accept(state, prop, alpha, mix))
 
@@ -315,7 +305,6 @@ object AdaptiveMetropolis {
     n: Int = 1000, thinrate: Int = 1000,
     burnin: Int = 0,
     write_files: Boolean = false,
-    trace_file: String = "./Figures/adaptive_trace_Scala.png",
     sample_file: String = "./data/scala_sample",
     prog: Boolean = false,
     mix: Boolean = false,
@@ -381,8 +370,6 @@ object AdaptiveMetropolis {
       val x_sample = sample.map(_.x)
 
         // Plotting has been moved over to be external, see diagnostics.org
-      // plot the trace of the first coordinate
-      //plot_trace(sample.map(_.x), trace_file)
     }
   }
 
