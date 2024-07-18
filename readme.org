@@ -69,7 +69,7 @@ val d = 10
 // create a chaotic variance to target
 val data = Gaussian(0,1).sample(d*d).toArray.grouped(d).toArray
 val M = DenseMatrix(data: _*)
-val sigma = M.t * M
+val sigma = solve(M.t * M)
 #+end_src
 
 Note that Breeze's ~DenseMatrix~ and ~DenseVector~ are actually mutable in Scala, so we need to be careful not to mutate anything.
