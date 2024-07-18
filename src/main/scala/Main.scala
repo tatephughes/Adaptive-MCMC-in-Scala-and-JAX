@@ -282,10 +282,10 @@ object AdaptiveMetropolis {
 
   }
 
-  def read_sigma(d: Int): dm = {
+  def read_sigma(d: Int, file: String = "./data/very_chaotic_variance.csv"): dm = {
 
     // Read the file lines, skipping empty lines
-    val lines = Source.fromFile("./data/very_chaotic_variance.csv").getLines().filter(_.nonEmpty).toList
+    val lines = Source.fromFile(file).getLines().filter(_.nonEmpty).toList
 
     // Assuming the CSV is well-formed and every row has the same number of columns
     val data = lines.map(_.split(",").map(_.toDouble))
@@ -301,14 +301,15 @@ object AdaptiveMetropolis {
 
   }
 
-  def main(d: Int = 10,
-    n: Int = 1000, thinrate: Int = 1000,
+  def main(n: Int = 1000, thinrate: Int = 1000,
     burnin: Int = 0,
     write_files: Boolean = false,
     sample_file: String = "./data/scala_sample",
     prog: Boolean = false,
     mix: Boolean = false,
-    get_sigma: (Int => dm) = generate_sigma): Unit = {
+    sigma: dm = read_sigma(10, "./data/very_chaotic_variance.csv")): Unit = {
+
+    val d = sigma.cols
 
     // initial state
     val state0 = AM_state(2.0, // starts at "2" for safety
@@ -319,8 +320,6 @@ object AdaptiveMetropolis {
     )
 
     val startTime = System.nanoTime()
-
-    val sigma = get_sigma(d)
 
     // the sample
     val sample = AM_iterator(state0, sigma, prog, mix).drop(burnin).thin(thinrate).take(n).toArray
@@ -375,11 +374,10 @@ object AdaptiveMetropolis {
 
   @main def quick_run(args: String*): Unit = {
 
-    main(d=3, n=1000, thinrate=1, burnin=0,
+    main(n=1000, thinrate=1, burnin=0,
          write_files = false,
-         trace_file = "./Figures/scala_trace_basetest_IC.png",
          sample_file = "./data/scala_sample_quickrun",
-         get_sigma = generate_sigma,
+         sigma = generate_sigma(3),
          mix = false
     )
 
@@ -387,22 +385,24 @@ object AdaptiveMetropolis {
 
   @main def simple_run_IC(args: String*): Unit = {
 
-    main(d=100, n=10000, thinrate=100, burnin=0,
+    import scala.reflect.io.File
+    val currentDirectory = File(".").toAbsolute
+    println(currentDirectory)
+
+    main(n=10000, thinrate=100, burnin=0,
          write_files = true,
-         trace_file = args(0),
-         sample_file = args(1),
-         get_sigma = read_sigma,
+         sample_file = args(0),
+         sigma = read_sigma(args(1).toInt, args(2)),
          mix = false
     )
   }
 
   @main def simple_run_MD(args: String*): Unit = {
 
-    main(d=100, n=10000, thinrate=100, burnin=0,
+    main(n=10000, thinrate=100, burnin=0,
          write_files = true,
-         trace_file = args(0),
-         sample_file = args(1),
-         get_sigma = read_sigma,
+         sample_file = args(0),
+         sigma = read_sigma(args(1).toInt, args(2)),
          mix = true
     )
   }

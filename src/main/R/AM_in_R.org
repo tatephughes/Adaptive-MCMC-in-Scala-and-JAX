@@ -292,9 +292,9 @@ generate_sigma <- function(d) {
   return(sigma)
 }
 
-read_sigma <- function(d) {
+read_sigma <- function(d, file="./data/very_chaotic_variance.csv") {
 
-  sigma <- as.matrix(read.csv("./data/very_chaotic_variance.csv", header = FALSE))[1:d,1:d]  
+  sigma <- as.matrix(read.csv(file, header = FALSE))[1:d,1:d]  
 
   return(sigma[1:d,1:d])
   
@@ -308,15 +308,15 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
                  mix=FALSE,
                  write_files = FALSE, # whether to write out to files
                  sample_file = "./data/r_sample",
-                 get_sigma = read_sigma,
+                 sigma = read_sigma(10,"./data/very_chaotic_variance.csv"),
                  prog=FALSE,
                  seed=1){
 
   set.seed(seed)
+
+  d = dim(sigma)[1]
   
   numits <- n*thinrate + burnin
-
-  sigma <- get_sigma(d)
   
   qr <- qr(sigma)
   Q <- qr.Q(qr)

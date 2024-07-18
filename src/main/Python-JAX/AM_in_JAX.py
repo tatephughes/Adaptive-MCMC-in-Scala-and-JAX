@@ -229,12 +229,12 @@ def read_sigma(d, file_path = './data/very_chaotic_variance.csv'):
             matrix.append([float(item) for item in row])
     return jnp.array(matrix)[0:d,0:d]
 
-def main(d=10, n=1000, thinrate=1000, burnin=0,
+def main(n=1000, thinrate=1000, burnin=0,
          write_files = False,
          sample_file = "./data/jax_sample",
          mix = False,
          eps = 0.01,
-         get_sigma = read_sigma,
+         sigma = read_sigma(10, './data/very_chaotic_variance.csv'),
          use_64 = False,
          seed=1):
 
@@ -242,6 +242,8 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
     """
 
     jax.config.update('jax_enable_x64', use_64)
+
+    d = sigma.shape[0]
     
     # the actual number of iterations is n*thin + burnin
 
@@ -249,7 +251,6 @@ def main(d=10, n=1000, thinrate=1000, burnin=0,
     key = jax.random.PRNGKey(seed=seed)
     keys = rand.split(key, n + burnin + 1)
     
-    sigma = get_sigma(d=d)
     Q, R = qr(sigma) # take the QR decomposition of sigma
 
     # initial state before burn-in, j starts at "2" for safetys
