@@ -10,24 +10,14 @@ We perform some diagnostics in R.
 #+begin_src R :session example :results output :exports both
 # Read the data in
 
-# compute_time_scala_IC, sample_scala_IC, bvals_scala_IC
-source("./data/scala_sample_basetest_IC")
-
-# compute_time_scala_MD, sample_scala_MD, bvals_scala_MD
-source("./data/scala_sample_basetest_MD")
-
-# compute_time_jax_32_IC, sample_jax_32_IC, bvals_jax_32_IC
-source("./data/jax_sample_basetest_IC")
-
-# compute_time_jax_32_MD, sample_jax_32_MD, bvals_jax_32_MD
-source("./data/jax_sample_basetest_MD")
-
-# compute_time_r_IC, sample_r_IC, bvals_r_IC
-source("./data/r_sample_basetest_IC")
-
-# compute_time_r_MD, sample_r_MD, bvals_r_MD
-source("./data/r_sample_basetest_MD")
-
+# compute_time_<prog>_<type>_<label>_<i>, sample_<prog>_<type>_<label>_<i>, bvals_<prog>_<type>_<label>_<i>
+for (label in c("scala", "r", "jax")){
+  for (type in c("IC", "MD")){
+    for (i in (1:5)){
+      source(paste("./data/", label, "_sample_", type, "_laptopd3_", i, sep=''))
+    }
+  }
+}
 
 # these should all come from the settings
 thinrate <- 100
@@ -37,6 +27,18 @@ d <- 100
 #+end_src
 
 #+RESULTS:
+#+begin_example
+Error in source("./data/r_sample_IC_pc_1") : 
+  ./data/r_sample_IC_pc_1:13:39: unexpected '{'
+12: 
+13: output_results <- function(){ chain_r_{
+                                          ^
+Error in source("./data/r_sample_MD_pc_1") : 
+  ./data/r_sample_MD_pc_1:13:39: unexpected '{'
+12: 
+13: output_results <- function(){ chain_r_{
+                                          ^
+#+end_example
 
 #+begin_src R :session example :results output :exports both
 r_IC_chain <- mcmc(sample_r_IC, thin=thinrate, start=0)

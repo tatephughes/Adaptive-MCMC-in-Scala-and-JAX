@@ -305,6 +305,7 @@ object AdaptiveMetropolis {
     burnin: Int = 0,
     write_files: Boolean = false,
     sample_file: String = "./data/scala_sample",
+    var_labels: String = "test",
     prog: Boolean = false,
     mix: Boolean = false,
     sigma: dm = read_sigma(10, "./data/very_chaotic_variance.csv")): Unit = {
@@ -351,10 +352,14 @@ object AdaptiveMetropolis {
 
       print(s"Saving to the file $sample_file...\n")
 
-      val instance = if (mix) {"MD"} else {"IC"}
+      val instance = if (mix) {s"MD_${var_labels}"} else {s"IC_${var_labels}"}
       val samplestring = DenseMatrix(sample.map(_.x)*).toArray.mkString(", ")
 
+      val results_func = s"output_results_scala_${instance} <- function(){chain_jax_${instance} <- mcmc(sample_jax_${instance}, thin=${thinrate}, start=0); min_ess <- min(effectiveSize(chain_jax_${instance})); print(paste('The optimal sampling value of x_1 is', ${sigma(0,0)} * (5.6644/{d}))); print(paste('The actual sampling value of x_1 is', ${sigma_j(0,0)} * (5.6644/${d}))); print(paste('The initial b value is', b1_jax_${instance})); print(paste('The final b value is', tail(b_vals_jax_${instance}, n=1)); print(paste('The acceptance rate is', acc_rate_jax_${instance})); print(paste('The computation took', compute_time_jax_${instance}, 'seconds')); print(paste('The minimum Effective Sample Size is', min_ess)); print(paste('The minimum ESS per second is', min_ess/compute_time_jax_${instance}))}"
+
       val lines: Seq[String] = Seq(
+        s"library(coda)",
+        s"b1_jax_${instance} <- ${b1}",
         s"compute_time_scala_$instance <- $duration",
         s"sample_scala_$instance <- matrix(c($samplestring), ncol=$d)",
         s"bvals_scala_$instance <- c($b_values)"
@@ -392,7 +397,8 @@ object AdaptiveMetropolis {
     main(n=10000, thinrate=100, burnin=0,
          write_files = true,
          sample_file = args(0),
-         sigma = read_sigma(args(1).toInt, args(2)),
+         var_labels = args(1),
+         sigma = read_sigma(args(2).toInt, args(3)),
          mix = false
     )
   }
@@ -402,7 +408,8 @@ object AdaptiveMetropolis {
     main(n=10000, thinrate=100, burnin=0,
          write_files = true,
          sample_file = args(0),
-         sigma = read_sigma(args(1).toInt, args(2)),
+         var_labels = args(1),
+         sigma = read_sigma(args(2).toInt, args(3)),
          mix = true
     )
   }

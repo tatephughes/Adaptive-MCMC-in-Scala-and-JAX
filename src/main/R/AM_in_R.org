@@ -308,6 +308,7 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
                  mix=FALSE,
                  write_files = FALSE, # whether to write out to files
                  sample_file = "./data/r_sample",
+                 var_labels = "test",
                  sigma = read_sigma(10,"./data/very_chaotic_variance.csv"),
                  prog=FALSE,
                  seed=1){
@@ -374,25 +375,24 @@ main <- function(d=10, n=1000, thinrate=1000, burnin=0,
     print(paste("Saving to the file", sample_file, "..."))
 
     if (mix) {
-      instance = "MD"
+      instance = paste("MD", var_labels, sep='_')
     } else {
-      instance = "IC"
+      instance = paste("IC", var_labels, sep='_')
     }
 
     samplestring = paste(sapply(sample, function(y){toString(y$x)}), collapse=', ')
 
-    results_func = paste("output_results <- function(){",
-                            "chain_r_{instance} <- mcmc(sample_r_", instance, "thin=", thinrate, "start=0); min_ess <- min(effectiveSize(chain_r_", instance, ")); print(paste('The optimal sampling value of x_1 is', ", sigma[1,1], " * (5.6644/", d, "))); print(paste('The actual sampling value of x_1 is', ", sigma_j[0,0], " * (5.6644/", d, "))); print(paste('The initial b value is', b1_r_", instance, ")); print(paste('The final b value is', b_vals_r_", instance, "[-1])); print(paste('The acceptance rate is', acc_rate_r_", instance, ")); print(paste('The computation took', compute_time_r_ ", instance, ", 'seconds')); print(paste('The minimum Effective Sample Size is', min_ess)); print(paste('The minimum ESS per second is', min_ess/compute_time_r_", instance, "}))",
-                            "}")
+    results_func = paste("output_results_r_", instance, "<- function(){",
+                            "chain_r_", instance, " <- mcmc(sample_r_", instance, ", thin=", thinrate, ", start=0); min_ess <- min(effectiveSize(chain_r_", instance, ")); print(paste('The optimal sampling value of x_1 is', ", sigma[1,1], " * (5.6644/", d, "))); print(paste('The actual sampling value of x_1 is', ", sigma_j[1,1], " * (5.6644/", d, "))); print(paste('The initial b value is', b1_r_", instance, ")); print(paste('The final b value is', tail(b_vals_r_", instance, ", n=1))); print(paste('The acceptance rate is', acc_rate_r_", instance, ")); print(paste('The computation took', compute_time_r_", instance, ", 'seconds')); print(paste('The minimum Effective Sample Size is', min_ess)); print(paste('The minimum ESS per second is', min_ess/compute_time_r_", instance, "))",
+                            "}", sep='')
     
     lines = c(
       "library(coda)",
-      paste("b1_r", instance, " <- ", b1, sep=''),
+      paste("b1_r_", instance, " <- ", b1, sep=''),
       paste("acc_rate_r_", instance, " <- ", acc_rate, sep=''),
       paste("compute_time_r_", instance, " <- ", as.numeric(duration), sep=''),
       paste("sample_r_", instance, " <- matrix(c(", samplestring, "), ncol=", d, ", byrow=TRUE)", sep=''),
-      paste("bvals_r_", instance, " <- c(", b_values, ")", sep=''),
-      results_func
+      paste("bvals_r_", instance, " <- c(", b_values, ")", sep='')
     )
 
     cat(paste(lines, collapse = "\n\n"), file = sample_file)

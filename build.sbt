@@ -17,6 +17,7 @@ lazy val root = project
     //),
 
     libraryDependencies  ++= Seq(
+      "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
       "org.scalatest" %% "scalatest" % "3.2.14" % "test",
       "org.scalanlp" %% "breeze" % "2.1.0",
       "org.scalanlp" %% "breeze-viz" % "2.1.0",

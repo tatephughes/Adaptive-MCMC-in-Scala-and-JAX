@@ -232,6 +232,7 @@ def read_sigma(d, file_path = './data/very_chaotic_variance.csv'):
 def main(n=1000, thinrate=1000, burnin=0,
          write_files = False,
          sample_file = "./data/jax_sample",
+         var_labels = "test",
          mix = False,
          eps = 0.01,
          sigma = read_sigma(10, './data/very_chaotic_variance.csv'),
@@ -299,21 +300,21 @@ def main(n=1000, thinrate=1000, burnin=0,
         print("Done!")
         
         print(f"Saving to the file {sample_file}...")
-    
+        
         if mix:
             if use_64:
-                instance = "64_MD"
+                instance = f"64_MD_{var_labels}"
             else:
-                instance = "32_MD"
+                instance = f"32_MD_{var_labels}"
         else:
             if use_64:
-                instance = "64_IC"
+                instance = f"64_IC_{var_labels}"
             else:
-                instance = "32_IC"
+                instance = f"32_IC_{var_labels}"
 
-        results_func = ''.join(("output_results <- function(){",
-                            f"chain_jax_{instance} <- mcmc(sample_jax_{instance}, thin={thinrate}, start=0); min_ess <- min(effectiveSize(chain_jax_{instance})); print(paste('The optimal sampling value of x_1 is', {sigma[0,0]} * (5.6644/{d}))); print(paste('The actual sampling value of x_1 is', {sigma_j[0,0]} * (5.6644/{d}))); print(paste('The initial b value is', b1_jax_{instance})); print(paste('The final b value is', b_vals_jax_{instance}[-1])); print(paste('The acceptance rate is', acc_rate_jax_{instance})); print(paste('The computation took', compute_time_jax_{instance}, 'seconds')); print(paste('The minimum Effective Sample Size is', min_ess)); print(paste('The minimum ESS per second is', min_ess/compute_time_jax_{instance}))",
-                            "}"))
+        results_func = ''.join((f"output_results_jax_{instance} <- function()", "{", 
+                                f"chain_jax_{instance} <- mcmc(sample_jax_{instance}, thin={thinrate}, start=0); min_ess <- min(effectiveSize(chain_jax_{instance})); print(paste('The optimal sampling value of x_1 is', {sigma[0,0]} * (5.6644/{d}))); print(paste('The actual sampling value of x_1 is', {sigma_j[0,0]} * (5.6644/{d}))); print(paste('The initial b value is', b1_jax_{instance})); print(paste('The final b value is', tail(b_vals_jax_{instance}, n=1)); print(paste('The acceptance rate is', acc_rate_jax_{instance})); print(paste('The computation took', compute_time_jax_{instance}, 'seconds')); print(paste('The minimum Effective Sample Size is', min_ess)); print(paste('The minimum ESS per second is', min_ess/compute_time_jax_{instance}))",
+                                "}"))
 
         lines = [
             "library(coda)",
@@ -321,17 +322,15 @@ def main(n=1000, thinrate=1000, burnin=0,
             f"acc_rate_jax_{instance} <- {acc_rate}",
             f"compute_time_jax_{instance} <- {duration}",
             f"sample_jax_{instance} <- matrix(c(" + ', '.join(map(str, sample[1].flatten())) + f"), ncol={d}, byrow=TRUE)",
-            f"b_vals_jax_{instance} <- c(" + b_values + ")",
-            results_func
+            f"b_vals_jax_{instance} <- c(" + b_values + ")"
         ]
-                
+        
         with open(sample_file, 'w') as f:
             for line in lines:
-                    f.write(line + "\n\n")
-
+                f.write(line + "\n\n")
         print("Done!")
 
-        # Plotting has been moved over to be external, see diagnostics.org
+        # Plotting has been moved over to be external, see diagnostics.orgt
         
     return sample
 
