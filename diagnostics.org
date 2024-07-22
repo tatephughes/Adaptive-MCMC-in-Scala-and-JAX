@@ -14,7 +14,7 @@ We perform some diagnostics in R.
 for (label in c("scala", "r", "jax")){
   for (type in c("IC", "MD")){
     for (i in (1:5)){
-      source(paste("./data/", label, "_sample_", type, "_laptopd3_", i, sep=''))
+      source(paste("./data/", label, "_sample_", type, "_pc_", i, sep=''))
     }
   }
 }
