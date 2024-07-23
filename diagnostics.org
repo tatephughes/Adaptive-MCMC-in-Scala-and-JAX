@@ -26,18 +26,85 @@ burnin <- 0
 d <- 100
 #+end_src
 
+#+begin_src R :session example :results output :exports both
+scala_IC_chain <- list()
+#scala_IC_chain[[1]] <- mcmc(sample_scala_IC_pc_1, thin=thinrate, start=0)
+scala_IC_chain[[2]] <- mcmc(sample_scala_IC_pc_2, thin=thinrate, start=0)
+scala_IC_chain[[3]] <- mcmc(sample_scala_IC_pc_3, thin=thinrate, start=0)
+scala_IC_chain[[4]] <- mcmc(sample_scala_IC_pc_4, thin=thinrate, start=0)
+scala_IC_chain[[5]] <- mcmc(sample_scala_IC_pc_5, thin=thinrate, start=0)
+
+scala_IC_meanminess <- mean(unlist(lapply(scala_IC_chain, function(l){min(effectiveSize(l))})))
+
+scala_MD_chain <- list()
+scala_MD_chain[[1]] <- mcmc(sample_scala_MD_pc_1, thin=thinrate, start=0)
+scala_MD_chain[[2]] <- mcmc(sample_scala_MD_pc_2, thin=thinrate, start=0)
+scala_MD_chain[[3]] <- mcmc(sample_scala_MD_pc_3, thin=thinrate, start=0)
+scala_MD_chain[[4]] <- mcmc(sample_scala_MD_pc_4, thin=thinrate, start=0)
+scala_MD_chain[[5]] <- mcmc(sample_scala_MD_pc_5, thin=thinrate, start=0)
+
+scala_MD_meanminess <- mean(unlist(lapply(scala_MD_chain, function(l){min(effectiveSize(l))})))
+
+jax_32_IC_chain <- list()
+jax_32_IC_chain[[1]] <- mcmc(sample_jax_32_IC_pc_1, thin=thinrate, start=0)
+jax_32_IC_chain[[2]] <- mcmc(sample_jax_32_IC_pc_2, thin=thinrate, start=0)
+jax_32_IC_chain[[3]] <- mcmc(sample_jax_32_IC_pc_3, thin=thinrate, start=0)
+jax_32_IC_chain[[4]] <- mcmc(sample_jax_32_IC_pc_4, thin=thinrate, start=0)
+jax_32_IC_chain[[5]] <- mcmc(sample_jax_32_IC_pc_5, thin=thinrate, start=0)
+
+jax_32_IC_meanminess <- mean(unlist(lapply(jax_32_IC_chain, function(l){min(effectiveSize(l))})))
+
+jax_32_MD_chain <- list()
+jax_32_MD_chain[[1]] <- mcmc(sample_jax_32_MD_pc_1, thin=thinrate, start=0)
+jax_32_MD_chain[[2]] <- mcmc(sample_jax_32_MD_pc_2, thin=thinrate, start=0)
+jax_32_MD_chain[[3]] <- mcmc(sample_jax_32_MD_pc_3, thin=thinrate, start=0)
+jax_32_MD_chain[[4]] <- mcmc(sample_jax_32_MD_pc_4, thin=thinrate, start=0)
+jax_32_MD_chain[[5]] <- mcmc(sample_jax_32_MD_pc_5, thin=thinrate, start=0)
+
+jax_32_MD_meanminess <- mean(unlist(lapply(jax_32_MD_chain, function(l){min(effectiveSize(l))})))
+
+r_IC_chain <- list()
+r_IC_chain[[1]] <- mcmc(sample_r_IC_pc_1, thin=thinrate, start=0)
+r_IC_chain[[2]] <- mcmc(sample_r_IC_pc_2, thin=thinrate, start=0)
+r_IC_chain[[3]] <- mcmc(sample_r_IC_pc_3, thin=thinrate, start=0)
+r_IC_chain[[4]] <- mcmc(sample_r_IC_pc_4, thin=thinrate, start=0)
+r_IC_chain[[5]] <- mcmc(sample_r_IC_pc_5, thin=thinrate, start=0)
+
+r_IC_meanminess <- mean(unlist(lapply(r_IC_chain, function(l){min(effectiveSize(l))})))
+
+r_MD_chain <- list()
+r_MD_chain[[1]] <- mcmc(sample_r_MD_pc_1, thin=thinrate, start=0)
+r_MD_chain[[2]] <- mcmc(sample_r_MD_pc_2, thin=thinrate, start=0)
+r_MD_chain[[3]] <- mcmc(sample_r_MD_pc_3, thin=thinrate, start=0)
+r_MD_chain[[4]] <- mcmc(sample_r_MD_pc_4, thin=thinrate, start=0)
+r_MD_chain[[5]] <- mcmc(sample_r_MD_pc_5, thin=thinrate, start=0)
+
+r_MD_meanminess <- mean(unlist(lapply(r_MD_chain, function(l){min(effectiveSize(l))})))
+
+
+
+#+end_src
+
 #+RESULTS:
 #+begin_example
-Error in source("./data/r_sample_IC_pc_1") : 
-  ./data/r_sample_IC_pc_1:13:39: unexpected '{'
-12: 
-13: output_results <- function(){ chain_r_{
-                                          ^
-Error in source("./data/r_sample_MD_pc_1") : 
-  ./data/r_sample_MD_pc_1:13:39: unexpected '{'
-12: 
-13: output_results <- function(){ chain_r_{
-                                          ^
+Error in attr(data, "mcpar") <- c(start, end, thin) : 
+  attempt to set an attribute on NULL
+Error: object 'sample_jax_IC_pc_1' not found
+Error: object 'sample_jax_IC_pc_2' not found
+Error: object 'sample_jax_IC_pc_3' not found
+Error: object 'sample_jax_IC_pc_4' not found
+Error: object 'sample_jax_IC_pc_5' not found
+Warning message:
+In mean.default(unlist(lapply(jax_IC_chain, function(l) { :
+  argument is not numeric or logical: returning NA
+Error: object 'sample_jax_MD_pc_1' not found
+Error: object 'sample_jax_MD_pc_2' not found
+Error: object 'sample_jax_MD_pc_3' not found
+Error: object 'sample_jax_MD_pc_4' not found
+Error: object 'sample_jax_MD_pc_5' not found
+Warning message:
+In mean.default(unlist(lapply(jax_MD_chain, function(l) { :
+  argument is not numeric or logical: returning NA
 #+end_example
 
 #+begin_src R :session example :results output :exports both
