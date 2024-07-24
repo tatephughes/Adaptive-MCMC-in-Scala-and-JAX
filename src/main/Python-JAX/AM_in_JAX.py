@@ -7,6 +7,7 @@ import jax.lax as jl
 import jax.random as rand
 from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
 from jax.scipy.linalg import solve_triangular
+from jax.lax.linalg import triangular_solve
 import numpy as np
 import time
 import csv
@@ -58,6 +59,20 @@ def try_accept(state, prop, alpha, mix, eps, key):
                                0.01*jnp.identity(d)
                                  )*5.6644/(j*d)],
                             default = 1)
+
+  # update proposal covariance
+  #prop_cov_new = jnp.select(condlist   = [mix | (j<2*d), (not mix) & (j>=2*d)],
+  #                          choicelist = [
+  #                            prop_cov*((j-1)/j) +
+  #                            (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new) +
+  #                             jnp.outer(x_new - x_mean_new, x_new - x_mean_new)
+  #                               )*5.6644/(j*d),
+  #                            prop_cov*((j-1)/j) +
+  #                            (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new) +
+  #                             jnp.outer(x_new - x_mean_new, x_new - x_mean_new) +
+  #                             0.01*jnp.identity(d)
+  #                               )*5.6644/(j*d)],
+  #                          default = 1)
   
   return((j + 1,
           x_new,
@@ -83,14 +98,21 @@ def adapt_step(state, q, r, mix, eps, key):
     
     keys = rand.split(key,3)
 
-    prop = jl.cond(jnp.logical_or(j <= 2, jnp.logical_and(mix, rand.uniform(keys[0]) < eps)),
+    prop = jl.cond(jnp.logical_or(j <= 2*d, jnp.logical_and(mix, rand.uniform(keys[0]) < eps)),
                    lambda key: rand.normal(key, shape=(d,))/(jnp.sqrt(100*d)) + x, # 'Safe' sampler
                    lambda key: rand.multivariate_normal(key, x, prop_cov), # 'Adaptive' sampler
                    keys[1])
-    
+
+    #prop = jl.cond((j <= 2*d) | (mix & (rand.uniform(keys[0]) < 0.01)),
+    #               lambda key: rand.normal(key, shape=(d,))/(jnp.sqrt(100*d)) + x, # 'Safe' sampler
+    #               lambda key: rand.multivariate_normal(key, x, prop_cov), # 'Adaptive' sampler
+    #               keys[1])
+
     # Compute the log Hastings ratio
-    alpha = 0.5 * (x.T @ (solve(r, q.T @ x)) - (prop.T @ solve(r, q.T @ prop)))
-                   
+    # triangular_solve from jax.lax.linalg seems to be significantly faster than
+    # solve_triangular from jax.scipy. This could be interesting to look into.
+    alpha = 0.5 * (x.T @ (triangular_solve(r, q.T @ x)) - (prop.T @ triangular_solve(r, q.T @ prop)))
+    
     return(try_accept(state, prop, alpha, mix, eps, keys[2]))
 
 def cov(sample):
@@ -254,8 +276,9 @@ def main(n=1000, thinrate=1000, burnin=0,
     
     Q, R = qr(sigma) # take the QR decomposition of sigma
 
-    # initial state before burn-in, j starts at "2" for safetys
+    # initial state before burn-in, j starts at "2" for safety
     state0 = (2, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, 0)
+    
     def step(carry, key):
         nextstate = thinned_step(thinrate, carry, Q, R, mix, eps, key)
         return(nextstate, nextstate)
