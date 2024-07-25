@@ -46,7 +46,7 @@ echo "JAX Outputs (IC)"
 for ((i = 1; i < 6; i++)); do
     sample_file="'./data/jax_sample_IC_${label}_${i}'"
     var_label="'${label}_${i}'"
-    ~/CPUJAX/bin/python -c "import sys; sys.path.append('./src/main/Python-JAX/'); from AM_in_JAX import *; main(sigma=read_sigma(100, './data/target_variance.csv'), n=10000, thinrate=100, burnin=0, write_files=True, mix=False, sample_file=${sample_file}, use_64=False, var_labels=${var_label})"
+    ~/CPUJAX/bin/python -c "import sys; sys.path.append('./src/main/Python-JAX/'); from AM_in_JAX import *; main(sigma=read_sigma(100, './data/target_variance.csv'), n=10000, thinrate=100, burnin=0, write_files=True, mix=False, sample_file=${sample_file}, use_64=False, var_labels=${var_label}, seed=${i})"
 done
 
 echo "JAX Outputs (MD)"

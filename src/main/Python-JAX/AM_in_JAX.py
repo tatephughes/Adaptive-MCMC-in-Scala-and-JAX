@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
-import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 import jax.lax as jl
 import jax.random as rand
 from jax.numpy.linalg import solve, qr, norm, eig, eigh, inv, cholesky, det
 from jax.scipy.linalg import solve_triangular
-from jax.lax.linalg import triangular_solve
+#from jax.lax.linalg import triangular_solve
 import numpy as np
 import time
 import csv
@@ -16,7 +15,7 @@ import re
 
 jax.config.update('jax_enable_x64', False)
 
-def try_accept(state, prop, alpha, mix, eps, key):
+def try_accept(state, prop, alpha, mix, key):
 
   """ Accepts a proposed move from ~state~ with probability ~exp(min(0,alpha))~
   
@@ -47,7 +46,7 @@ def try_accept(state, prop, alpha, mix, eps, key):
   x_mean_new = (x_mean*j + x_new)/(j+1)
 
   # update proposal covariance
-  prop_cov_new = jnp.select(condlist   = [jnp.logical_or(mix, j<2*d), jnp.logical_and(not mix, j>=2*d)],
+  prop_cov_new = jnp.select(condlist   = [mix | (j<2*d), (not mix) & (j>=2*d)],
                             choicelist = [
                               prop_cov*((j-1)/j) +
                               (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new) +
@@ -59,20 +58,6 @@ def try_accept(state, prop, alpha, mix, eps, key):
                                0.01*jnp.identity(d)
                                  )*5.6644/(j*d)],
                             default = 1)
-
-  # update proposal covariance
-  #prop_cov_new = jnp.select(condlist   = [mix | (j<2*d), (not mix) & (j>=2*d)],
-  #                          choicelist = [
-  #                            prop_cov*((j-1)/j) +
-  #                            (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new) +
-  #                             jnp.outer(x_new - x_mean_new, x_new - x_mean_new)
-  #                               )*5.6644/(j*d),
-  #                            prop_cov*((j-1)/j) +
-  #                            (j*jnp.outer(x_mean-x_mean_new, x_mean-x_mean_new) +
-  #                             jnp.outer(x_new - x_mean_new, x_new - x_mean_new) +
-  #                             0.01*jnp.identity(d)
-  #                               )*5.6644/(j*d)],
-  #                          default = 1)
   
   return((j + 1,
           x_new,
@@ -80,7 +65,7 @@ def try_accept(state, prop, alpha, mix, eps, key):
           prop_cov_new,
           accept_count + is_accepted))
 
-def adapt_step(state, q, r, mix, eps, key):
+def adapt_step(state, q, r, mix, key):
 
     """ Samples from the current proposal distribution and computes the log Hastings Ratio, and returns the next state according to ~try_accept~
 
@@ -97,23 +82,19 @@ def adapt_step(state, q, r, mix, eps, key):
     prop_cov = state[3]
     
     keys = rand.split(key,3)
+    eps = 0.01
 
-    prop = jl.cond(jnp.logical_or(j <= 2*d, jnp.logical_and(mix, rand.uniform(keys[0]) < eps)),
+    prop = jl.cond((j <= 2*d) | (mix & (rand.uniform(keys[0]) < eps)),
                    lambda key: rand.normal(key, shape=(d,))/(jnp.sqrt(100*d)) + x, # 'Safe' sampler
                    lambda key: rand.multivariate_normal(key, x, prop_cov), # 'Adaptive' sampler
                    keys[1])
-
-    #prop = jl.cond((j <= 2*d) | (mix & (rand.uniform(keys[0]) < 0.01)),
-    #               lambda key: rand.normal(key, shape=(d,))/(jnp.sqrt(100*d)) + x, # 'Safe' sampler
-    #               lambda key: rand.multivariate_normal(key, x, prop_cov), # 'Adaptive' sampler
-    #               keys[1])
-
-    # Compute the log Hastings ratio
-    # triangular_solve from jax.lax.linalg seems to be significantly faster than
-    # solve_triangular from jax.scipy. This could be interesting to look into.
-    alpha = 0.5 * (x.T @ (triangular_solve(r, q.T @ x)) - (prop.T @ triangular_solve(r, q.T @ prop)))
     
-    return(try_accept(state, prop, alpha, mix, eps, keys[2]))
+    # Compute the log Hastings ratio
+    # why does jax.lax.linalg.traingular solve just kinda not work?
+    alpha = 0.5 * ((x.T @ solve_triangular(r, q.T @ x))
+    - (prop.T @ solve_triangular(r, q.T @ prop)))
+                   
+    return(try_accept(state, prop, alpha, mix, keys[2]))
 
 def cov(sample):
     
@@ -131,14 +112,14 @@ def mhead(M, n=3):
 
     return M[0:n,0:n]
 
-def thinned_step(thinrate, state, q, r, eps, mix, key):
+def thinned_step(thinrate, state, q, r, mix, key):
 
-    """Performs ~thinrate~ iterations of adapt_step, without saving the intermediate steps"""
+    """Performs ~thinrate~ iterations of adapt_step, withour saving the intermiade steps"""
     
     keys = rand.split(key,thinrate)
 
     # I think this should scan over the keys!
-    return jl.fori_loop(0, thinrate, (lambda i, x: adapt_step(x, q, r, mix, eps, keys[i])), state)
+    return jl.fori_loop(0, thinrate, (lambda i, x: adapt_step(x, q, r, mix, keys[i])), state)
 
 def sub_optim_factor(sigma, sigma_j):
 
@@ -150,7 +131,7 @@ def sub_optim_factor(sigma, sigma_j):
     # looking at their code, this might be what was intended?
     lam = eig(sigma_j @ inv(sigma))[0]
     
-    b = (d * sum(lam**-2) / sum(lam**-1)**2).real
+    b = (d * sum(lam**(-2)) / sum(lam**(-1))**2).real
 
     return b
 
@@ -197,13 +178,13 @@ def run_with_complexity(sigma_d, mix, key):
     state0 = (2, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, 0)
     
     def step(carry, key):
-        nextstate = thinned_step(thinrate, carry, Q, R, mix, 0.01, key)
+        nextstate = thinned_step(thinrate, carry, Q, R, mix, key)
         return(nextstate, nextstate)
 
     start_time = time.time()
     
     # inital state, after burnin
-    start_state = jl.fori_loop(1, burnin+1, lambda i,x: adapt_step(x, Q, R, mix, 0.01, keys[i]), state0)
+    start_state = jl.fori_loop(1, burnin+1, lambda i,x: adapt_step(x, Q, R, mix, keys[i]), state0)
 
     # the sample
     am_sample = jl.scan(step, start_state, keys[burnin+1:])[1]
@@ -251,24 +232,23 @@ def read_sigma(d, file_path = './data/very_chaotic_variance.csv'):
             matrix.append([float(item) for item in row])
     return jnp.array(matrix)[0:d,0:d]
 
-def main(n=1000, thinrate=1000, burnin=0,
+def main(sigma = read_sigma(10, './data/very_chaotic_variance.csv'),
+         n=1000, thinrate=1000, burnin=0,
          write_files = False,
          sample_file = "./data/jax_sample",
          var_labels = "test",
          mix = False,
-         eps = 0.01,
-         sigma = read_sigma(10, './data/very_chaotic_variance.csv'),
          use_64 = False,
          seed=1):
 
-    """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.
+    """Runs the chain with a few diagnostics, mainly for testing. Returns a jax array containing the simulated sample.I
     """
 
     jax.config.update('jax_enable_x64', use_64)
-
-    d = sigma.shape[0]
     
     # the actual number of iterations is n*thin + burnin
+
+    d = sigma.shape[0]
 
     # keys for PRNG
     key = jax.random.PRNGKey(seed=seed)
@@ -276,17 +256,17 @@ def main(n=1000, thinrate=1000, burnin=0,
     
     Q, R = qr(sigma) # take the QR decomposition of sigma
 
-    # initial state before burn-in, j starts at "2" for safety
+    # initial state before burn-in, j starts at "2" for safetys
     state0 = (2, jnp.zeros(d), jnp.zeros(d), ((0.1)**2) * jnp.identity(d)/d, 0)
-    
+
     def step(carry, key):
-        nextstate = thinned_step(thinrate, carry, Q, R, mix, eps, key)
+        nextstate = thinned_step(thinrate, carry, Q, R, mix, key)
         return(nextstate, nextstate)
 
     start_time = time.time()
     
     # inital state, after burnin
-    start_state = jl.fori_loop(1, burnin+1, lambda i,x: adapt_step(x, Q, R, mix, eps, keys[i]), state0)
+    start_state = jl.fori_loop(1, burnin+1, lambda i,x: adapt_step(x, Q, R, mix, keys[i]), state0)
 
     # the sample
     sample = jl.scan(step, start_state, keys[burnin+1:])[1]
@@ -310,6 +290,7 @@ def main(n=1000, thinrate=1000, burnin=0,
     print(f"The acceptance rate is {acc_rate}")
     print(f"The computation took {duration} seconds")
 
+   
     if write_files:
 
         # This mess writes out the sample into a format to be read by R with "source("<filename>")"
@@ -353,7 +334,7 @@ def main(n=1000, thinrate=1000, burnin=0,
                 f.write(line + "\n\n")
         print("Done!")
 
-        # Plotting has been moved over to be external, see diagnostics.orgt
+        # Plotting has been moved over to be external, see diagnostics.org
         
     return sample
 
@@ -369,5 +350,13 @@ if __name__ == "__main__":
             print("Succesfully found working directory")
     else:
         print("In correct working directory")
+    
+    #sample = main(file = "./Figures/adaptive_trace_JAX_test.png", mix = True, get_sigma=read_sigma)
+
+    #compute_time_graph(read_sigma(d=10), "data/JAX_64bit_compute_times_laptop_test.csv")
+    #mixing_test(read_sigma, mix=True,
+    #            csvfile = "./data/so_factor_mixing.csv")
+    #mixing_test(read_sigma, mix=False,
+    #            csvfile = "./data/so_factor_not_mixing.csv")
 
     sample = main(d=10, n=1000, thinrate=1000, burnin=0, mix=False)
