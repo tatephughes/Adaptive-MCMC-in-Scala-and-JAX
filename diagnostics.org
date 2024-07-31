@@ -26,6 +26,57 @@ burnin <- 0
 d <- 100
 #+end_src
 
+#+begin_src R :session example :results none
+scala_IC_meantime <- (compute_time_scala_IC_pc_1 +
+                   compute_time_scala_IC_pc_2 +
+                   compute_time_scala_IC_pc_3 +
+                   compute_time_scala_IC_pc_4 +
+                   compute_time_scala_IC_pc_5) / 5
+
+scala__MD_meantime <- (compute_time_scala_MD_pc_1 +
+                   compute_time_scala_MD_pc_2 +
+                   compute_time_scala_MD_pc_3 +
+                   compute_time_scala_MD_pc_4 +
+                   compute_time_scala_MD_pc_5) / 5
+
+jax_32_IC_meantime <- (compute_time_jax_32_IC_pc_1 +
+                   compute_time_jax_32_IC_pc_2 +
+                   compute_time_jax_32_IC_pc_3 +
+                   compute_time_jax_32_IC_pc_4 +
+                   compute_time_jax_32_IC_pc_5) / 5
+
+jax32__MD_meantime <- (compute_time_jax32_MD_pc_1 +
+                   compute_time_jax32_MD_pc_2 +
+                   compute_time_jax32_MD_pc_3 +
+                   compute_time_jax32_MD_pc_4 +
+                   compute_time_jax32_MD_pc_5) / 5
+
+jax_64_IC_meantime <- (compute_time_jax_64_IC_pc_1 +
+                   compute_time_jax_64_IC_pc_2 +
+                   compute_time_jax_64_IC_pc_3 +
+                   compute_time_jax_64_IC_pc_4 +
+                   compute_time_jax_64_IC_pc_5) / 5
+
+jax64__MD_meantime <- (compute_time_jax64_MD_pc_1 +
+                   compute_time_jax64_MD_pc_2 +
+                   compute_time_jax64_MD_pc_3 +
+                   compute_time_jax64_MD_pc_4 +
+                   compute_time_jax64_MD_pc_5) / 5
+
+r_IC_meantime <- (compute_time_r_IC_pc_1 +
+                   compute_time_r_IC_pc_2 +
+                   compute_time_r_IC_pc_3 +
+                   compute_time_r_IC_pc_4 +
+                   compute_time_r_IC_pc_5) / 5
+
+r__MD_meantime <- (compute_time_r_MD_pc_1 +
+                   compute_time_r_MD_pc_2 +
+                   compute_time_r_MD_pc_3 +
+                   compute_time_r_MD_pc_4 +
+                   compute_time_r_MD_pc_5) / 5
+
+#+end_src
+
 #+begin_src R :session example :results output :exports both
 scala_IC_chain <- list()
 #scala_IC_chain[[1]] <- mcmc(sample_scala_IC_pc_1, thin=thinrate, start=0)
