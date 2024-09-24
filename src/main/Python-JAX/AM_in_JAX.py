@@ -290,7 +290,7 @@ def main(sigma = read_sigma(10, './data/very_chaotic_variance.csv'),
     print(f"The acceptance rate is {acc_rate}")
     print(f"The computation took {duration} seconds")
 
-   
+  
     if write_files:
 
         # This mess writes out the sample into a format to be read by R with "source("<filename>")"
